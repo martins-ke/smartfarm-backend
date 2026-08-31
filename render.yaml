@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: smartfarm-backend
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:mysql://mysql-28943d38-farm-app.k.aivencloud.com:24933/defaultdb?sslmode=require
+      - key: SPRING_DATASOURCE_USERNAME
+        value: avnadmin
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: PORT
+        value: 8001
+      - key: SERVER_PORT
+        value: 8001
