@@ -29,7 +29,7 @@ public class UserService {
 	private final PasswordEncoder passwordEncoder;
 
 	private static final long MAX_ADMINS = 1;
-	private static final long MAX_MANAGERS = 2;
+	private static final long MAX_MANAGERS = 2; 
 	private static final long MAX_SUPERVISORS = 10;
 
 	public UserService(UserRepository userRepo, CategoryRepository categoryRepo, ProjectRepository projectRepo, PasswordEncoder passwordEncoder) {
