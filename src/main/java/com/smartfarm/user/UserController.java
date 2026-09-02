@@ -89,6 +89,13 @@ public class UserController {
 		return service.getSupervisorProjects(id);
 	}
 
+	@PutMapping("/{id}/profile")
+	public ResponseEntity<ApiResponse<User>> updateProfile(
+			@PathVariable String id,
+			@RequestBody UpdateProfileRequest request) {
+		return service.updateProfile(id, request);
+	}
+
 	@DeleteMapping("/{id}")
 	public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable String id) {
 		return service.deleteUser(id);

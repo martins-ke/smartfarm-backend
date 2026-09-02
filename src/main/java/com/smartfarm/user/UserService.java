@@ -268,15 +268,44 @@ public class UserService {
 	}
 
 	@Transactional
+	public ResponseEntity<ApiResponse<User>> updateProfile(String id, UpdateProfileRequest request) {
+		User user = userRepo.findById(id)
+			.orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
+
+		if (request.username() != null && !request.username().trim().isEmpty()) {
+			String newUsername = request.username().trim();
+			if (!newUsername.equalsIgnoreCase(user.getUsername()) && userRepo.existsByUsername(newUsername)) {
+				return ResponseEntity.status(400).body(new ApiResponse<>(null, "Username is already taken.", false, Instant.now()));
+			}
+			user.setUsername(newUsername);
+		}
+
+		if (request.newPassword() != null && !request.newPassword().trim().isEmpty()) {
+			if (request.currentPassword() != null && !request.currentPassword().trim().isEmpty()) {
+				if (!passwordEncoder.matches(request.currentPassword().trim(), user.getPassword())) {
+					return ResponseEntity.status(400).body(new ApiResponse<>(null, "Incorrect current password.", false, Instant.now()));
+				}
+			}
+			user.setPassword(passwordEncoder.encode(request.newPassword().trim()));
+		}
+
+		User saved = userRepo.save(user);
+		return ResponseEntity.ok(new ApiResponse<>(saved, "Profile credentials updated successfully", true, Instant.now()));
+	}
+
+	@Transactional
 	public ResponseEntity<ApiResponse<Void>> deleteUser(String id) {
 		User user = userRepo.findById(id)
 			.orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
 
-		if ("ADMIN".equalsIgnoreCase(user.getRole())) {
-			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Cannot delete the primary Farm Administrator.", false, Instant.now()));
+		// If user is supervisor, unassign from supervised projects
+		List<Project> supervisedProjects = projectRepo.findBySupervisorId(id);
+		for (Project p : supervisedProjects) {
+			p.setSupervisor(null);
+			projectRepo.save(p);
 		}
 
 		userRepo.delete(user);
-		return ResponseEntity.ok(new ApiResponse<>(null, "User removed successfully", true, Instant.now()));
+		return ResponseEntity.ok(new ApiResponse<>(null, "Account removed successfully", true, Instant.now()));
 	}
 }
