@@ -156,11 +156,12 @@ class SalesServiceTest {
 	@Test
 	void getSalesByProjectId_returnsList() {
 		Sale s1 = new Sale("S001", "Milk", 10, new BigDecimal("70"), null, new BigDecimal("700"), mockProject, null);
-		when(salesRepo.findByProjectId("P001")).thenReturn(List.of(s1));
+		org.springframework.data.domain.Page<Sale> page = new org.springframework.data.domain.PageImpl<>(List.of(s1));
+		when(salesRepo.findByProjectId("P001", org.springframework.data.domain.PageRequest.of(0, 10))).thenReturn(page);
 
-		ResponseEntity<ApiResponse<List<Sale>>> response = salesService.getSalesByProjectId("P001");
+		ResponseEntity<ApiResponse<org.springframework.data.domain.Page<Sale>>> response = salesService.getSalesByProjectId("P001", 0, 10);
 		assertEquals(HttpStatus.OK, response.getStatusCode());
-		assertEquals(1, response.getBody().body().size());
+		assertEquals(1, response.getBody().body().getContent().size());
 	}
 
 	@Test
