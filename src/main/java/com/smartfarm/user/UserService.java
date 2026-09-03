@@ -17,6 +17,11 @@ import com.smartfarm.util.IdGenarator;
 
 import com.smartfarm.projects.Project;
 import com.smartfarm.projects.ProjectRepository;
+import com.smartfarm.auth.PasswordResetToken;
+import com.smartfarm.auth.PasswordResetTokenRepository;
+import com.smartfarm.auth.EmailService;
+import java.util.UUID;
+import java.time.temporal.ChronoUnit;
 
 import jakarta.persistence.EntityNotFoundException;
 
@@ -27,16 +32,19 @@ public class UserService {
 	private final CategoryRepository categoryRepo;
 	private final ProjectRepository projectRepo;
 	private final PasswordEncoder passwordEncoder;
+	private final PasswordResetTokenRepository tokenRepo;
+	private final EmailService emailService;
 
-	private static final long MAX_ADMINS = 1;
 	private static final long MAX_MANAGERS = 2; 
 	private static final long MAX_SUPERVISORS = 10;
 
-	public UserService(UserRepository userRepo, CategoryRepository categoryRepo, ProjectRepository projectRepo, PasswordEncoder passwordEncoder) {
+	public UserService(UserRepository userRepo, CategoryRepository categoryRepo, ProjectRepository projectRepo, PasswordEncoder passwordEncoder, PasswordResetTokenRepository tokenRepo, EmailService emailService) {
 		this.userRepo = userRepo;
 		this.categoryRepo = categoryRepo;
 		this.projectRepo = projectRepo;
 		this.passwordEncoder = passwordEncoder;
+		this.tokenRepo = tokenRepo;
+		this.emailService = emailService;
 	}
 
 	public ResponseEntity<ApiResponse<BootstrapStatusResponse>> checkBootstrap() {
@@ -54,7 +62,7 @@ public class UserService {
 			MAX_MANAGERS,
 			MAX_SUPERVISORS
 		);
-		return ResponseEntity.ok(new ApiResponse<>(status, "System status retrieved", true, Instant.now()));
+		return ResponseEntity.ok(new ApiResponse<>(status, "System status retrieved ✅", true, Instant.now()));
 	}
 
 	@Transactional
@@ -105,11 +113,11 @@ public class UserService {
 				}
 				assignedRole = "SUPERVISOR";
 			} else {
-				return ResponseEntity.status(400).body(new ApiResponse<>(null, "Invalid role selected.", false, Instant.now()));
+				return ResponseEntity.status(400).body(new ApiResponse<>(null, "Invalid role selected!", false, Instant.now()));
 			}
 
 			assignedStatus = "PENDING_APPROVAL";
-			successMessage = "Account created! Your registration is pending Administrator approval before you can sign in.";
+			successMessage = "Account created! Your registration is pending Administrator approval before you can sign in. Please contact your admin to confirm.";
 		}
 
 		long count = userRepo.count();
@@ -119,25 +127,32 @@ public class UserService {
 			id = IdGenarator.generateId(username, count);
 		}
 
+		String email = (request.email() != null && !request.email().trim().isEmpty()) ? request.email().trim() : null;
+		if (email != null && userRepo.findByEmail(email).isPresent()) {
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Email already registered! Try a different email.", false, Instant.now()));
+		}
+
 		String hashedPassword = passwordEncoder.encode(password);
-		User user = new User(id, username, hashedPassword, assignedRole, assignedStatus, null);
+		User user = new User(id, username, email, hashedPassword, assignedRole, assignedStatus, null);
 		User saved = userRepo.save(user);
 
 		return ResponseEntity.status(201).body(new ApiResponse<>(saved, successMessage, true, Instant.now()));
 	}
 
 	public ResponseEntity<ApiResponse<?>> login(LoginRequest request) {
-		String username = request.username().trim();
+		String identifier = request.username().trim();
 		String password = request.password().trim();
 
-		User user = userRepo.findByUsername(username);
+		User user = userRepo.findOptionalByUsername(identifier)
+				.orElseGet(() -> userRepo.findByEmail(identifier).orElse(null));
+
 		if (user == null) {
-			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Invalid username or password.", false, Instant.now()));
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Invalid username/email or password.", false, Instant.now()));
 		}
 
 		boolean passwordMatches = passwordEncoder.matches(password, user.getPassword());
 		if (!passwordMatches) {
-			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Invalid username or password.", false, Instant.now()));
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Invalid username/email or password.", false, Instant.now()));
 		}
 
 		if ("PENDING_APPROVAL".equalsIgnoreCase(user.getStatus())) {
@@ -149,6 +164,77 @@ public class UserService {
 		}
 
 		return ResponseEntity.status(200).body(new ApiResponse<>(user, "Login successful", true, Instant.now()));
+	}
+
+	public ResponseEntity<ApiResponse<?>> forgotPassword(ForgotPasswordRequest request) {
+		String email = request.email().trim();
+		User user = userRepo.findByEmail(email).orElse(null);
+		
+		if (user == null) {
+			// Don't leak that the user doesn't exist for security
+			return ResponseEntity.ok(new ApiResponse<>(null, "If the email exists, a reset link has been sent.", true, Instant.now()));
+		}
+
+		// Delete existing token if it exists
+		tokenRepo.findByUserId(user.getId()).ifPresent(tokenRepo::delete);
+
+		String tokenString = UUID.randomUUID().toString();
+		PasswordResetToken token = new PasswordResetToken(
+			tokenString,
+			user,
+			Instant.now().plus(15, ChronoUnit.MINUTES) // valid for 15 mins
+		);
+		tokenRepo.save(token);
+
+		// Use FRONTEND_URL environment variable if present, otherwise default to live Vercel production URL
+		String frontendUrl = System.getenv("FRONTEND_URL") != null 
+			? System.getenv("FRONTEND_URL").replaceAll("/+$", "") 
+			: "https://smartfarm-frontend-jade.vercel.app";
+		String resetLink = frontendUrl + "/reset-password?token=" + tokenString;
+		
+		try {
+			emailService.sendPasswordResetEmail(email, resetLink);
+		} catch (Exception e) {
+			return ResponseEntity.status(500).body(new ApiResponse<>(null, "Failed to send email. Check mail configuration.", false, Instant.now()));
+		}
+
+		return ResponseEntity.ok(new ApiResponse<>(null, "If the email exists, a reset link has been sent.", true, Instant.now()));
+	}
+
+	@Transactional
+	public ResponseEntity<ApiResponse<?>> resetPassword(ResetPasswordRequest request) {
+		String tokenString = request.token().trim();
+		String newPassword = request.newPassword().trim();
+
+		PasswordResetToken token = tokenRepo.findById(tokenString).orElse(null);
+		
+		if (token == null) {
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Invalid or expired token.", false, Instant.now()));
+		}
+
+		if (token.getExpiryDate().isBefore(Instant.now())) {
+			tokenRepo.delete(token);
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Token has expired. Please request a new one.", false, Instant.now()));
+		}
+
+		User user = token.getUser();
+		user.setPassword(passwordEncoder.encode(newPassword));
+		userRepo.save(user);
+		
+		tokenRepo.delete(token); // Delete token after use
+
+		return ResponseEntity.ok(new ApiResponse<>(null, "Password successfully reset. You can now log in.", true, Instant.now()));
+	}
+
+	@Transactional
+	public ResponseEntity<ApiResponse<User>> adminResetPassword(String userId, AdminResetPasswordRequest request) {
+		User user = userRepo.findById(userId)
+				.orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
+
+		user.setPassword(passwordEncoder.encode(request.newPassword().trim()));
+		userRepo.save(user);
+
+		return ResponseEntity.ok(new ApiResponse<>(user, "Password has been successfully updated by Admin.", true, Instant.now()));
 	}
 
 	public ResponseEntity<ApiResponse<List<User>>> getAllUsers(String role, String createdById) {
@@ -200,8 +286,13 @@ public class UserService {
 			id = IdGenarator.generateId(username, count);
 		}
 
+		String email = (request.email() != null && !request.email().trim().isEmpty()) ? request.email().trim() : null;
+		if (email != null && userRepo.findByEmail(email).isPresent()) {
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Email already registered! Try a different email.", false, Instant.now()));
+		}
+
 		String hashedPassword = passwordEncoder.encode(password);
-		User user = new User(id, username, hashedPassword, role, "ACTIVE", request.createdById());
+		User user = new User(id, username, email, hashedPassword, role, "ACTIVE", request.createdById());
 		User saved = userRepo.save(user);
 
 		return ResponseEntity.status(201).body(new ApiResponse<>(saved, role + " created and activated successfully.", true, Instant.now()));
@@ -278,7 +369,7 @@ public class UserService {
 				return ResponseEntity.status(400).body(new ApiResponse<>(null, "Username is already taken.", false, Instant.now()));
 			}
 			user.setUsername(newUsername);
-		}
+		} 
 
 		if (request.newPassword() != null && !request.newPassword().trim().isEmpty()) {
 			if (request.currentPassword() != null && !request.currentPassword().trim().isEmpty()) {

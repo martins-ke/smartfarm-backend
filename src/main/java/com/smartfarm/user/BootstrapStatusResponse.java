@@ -7,5 +7,5 @@ public record BootstrapStatusResponse(
     long managerCount,
     long supervisorCount,
     long maxManagers,
-    long maxSupervisors
-) {}
+    long maxSupervisors 
+) {} 

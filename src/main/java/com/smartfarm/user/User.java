@@ -23,6 +23,8 @@ public class User {
 	private String id;
 	@Column(unique = true, nullable = false)
 	private String username;
+	@Column(unique = true)
+	private String email;
 	@JsonIgnore
 	private String password;
 	@Column(nullable = false)
@@ -34,16 +36,17 @@ public class User {
 	@ManyToMany(fetch = FetchType.EAGER)
 	@JoinTable(
 		name = "user_assigned_categories",
-		joinColumns = @JoinColumn(name = "user_id"),
+		joinColumns = @JoinColumn(name = "user_id"), 
 		inverseJoinColumns = @JoinColumn(name = "category_id")
 	)
 	private Set<Category> assignedCategories = new HashSet<>();
 	
 	public User() {}
 
-	public User(String id, String username, String password, String role, String status, String createdById) {
+	public User(String id, String username, String email, String password, String role, String status, String createdById) {
 		this.id = id;
 		this.username = username;
+		this.email = email;
 		this.password = password;
 		this.role = role != null ? role.toUpperCase() : "MANAGER";
 		this.status = status != null ? status.toUpperCase() : "ACTIVE";
@@ -61,6 +64,12 @@ public class User {
 	}
 	public void setUsername(String username) {
 		this.username = username;
+	}
+	public String getEmail() {
+		return email;
+	}
+	public void setEmail(String email) {
+		this.email = email;
 	}
 	public String getPassword() {
 		return password;

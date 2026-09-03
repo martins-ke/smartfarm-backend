@@ -8,6 +8,7 @@ public record CreateStaffRequest(
     String username,
     @NotNull @NotBlank(message = "Password is required")
     String password,
+    String email,
     @NotNull @NotBlank(message = "Role is required (MANAGER or SUPERVISOR)")
     String role,
     String createdById

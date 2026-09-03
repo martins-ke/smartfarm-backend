@@ -50,6 +50,9 @@ class SalesServiceTest {
 	@Mock
 	private CustomerService customerService;
 
+	@Mock
+	private com.smartfarm.harvest.HarvestRepository harvestRepo;
+
 	@InjectMocks
 	private SalesService salesService;
 
@@ -65,6 +68,8 @@ class SalesServiceTest {
 	@Test
 	void createSale_withNewCustomer_successfullyCreatesSaleAndCustomer() {
 		when(projectRepo.findById("P001")).thenReturn(Optional.of(mockProject));
+		when(harvestRepo.totalHarvestQuantityByProjectId("P001")).thenReturn(100.0f);
+		when(salesRepo.totalSoldQuantityByProjectId("P001")).thenReturn(0.0f);
 		when(salesRepo.count()).thenReturn(0L);
 		when(salesRepo.existsById(anyString())).thenReturn(false);
 
@@ -97,6 +102,8 @@ class SalesServiceTest {
 	@Test
 	void createSale_withDuplicateCustomerContact_returnsBadRequest() {
 		when(projectRepo.findById("P001")).thenReturn(Optional.of(mockProject));
+		when(harvestRepo.totalHarvestQuantityByProjectId("P001")).thenReturn(100.0f);
+		when(salesRepo.totalSoldQuantityByProjectId("P001")).thenReturn(0.0f);
 		CustomerRequest custReq = new CustomerRequest("School cafeteria", "0784463737", "12345678", "Kitale", "new");
 		when(customerRepo.existsByContact("0784463737")).thenReturn(true);
 
@@ -113,6 +120,8 @@ class SalesServiceTest {
 	@Test
 	void createSale_withExistingCustomer_attachesFoundCustomer() {
 		when(projectRepo.findById("P001")).thenReturn(Optional.of(mockProject));
+		when(harvestRepo.totalHarvestQuantityByProjectId("P001")).thenReturn(100.0f);
+		when(salesRepo.totalSoldQuantityByProjectId("P001")).thenReturn(0.0f);
 		when(salesRepo.count()).thenReturn(5L);
 		when(salesRepo.existsById(anyString())).thenReturn(false);
 
@@ -133,6 +142,8 @@ class SalesServiceTest {
 	@Test
 	void createSale_withoutCustomer_successfullyCreatesSale() {
 		when(projectRepo.findById("P001")).thenReturn(Optional.of(mockProject));
+		when(harvestRepo.totalHarvestQuantityByProjectId("P001")).thenReturn(100.0f);
+		when(salesRepo.totalSoldQuantityByProjectId("P001")).thenReturn(0.0f);
 		when(salesRepo.count()).thenReturn(1L);
 		when(salesRepo.existsById(anyString())).thenReturn(false);
 		when(salesRepo.save(any(Sale.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -157,7 +168,7 @@ class SalesServiceTest {
 	void getSalesByProjectId_returnsList() {
 		Sale s1 = new Sale("S001", "Milk", 10, new BigDecimal("70"), null, new BigDecimal("700"), mockProject, null);
 		org.springframework.data.domain.Page<Sale> page = new org.springframework.data.domain.PageImpl<>(List.of(s1));
-		when(salesRepo.findByProjectId("P001", org.springframework.data.domain.PageRequest.of(0, 10))).thenReturn(page);
+		when(salesRepo.findByProjectId("P001", org.springframework.data.domain.PageRequest.of(0, 10, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "added_on")))).thenReturn(page);
 
 		ResponseEntity<ApiResponse<org.springframework.data.domain.Page<Sale>>> response = salesService.getSalesByProjectId("P001", 0, 10);
 		assertEquals(HttpStatus.OK, response.getStatusCode());

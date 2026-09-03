@@ -45,6 +45,23 @@ public class UserController {
 		return service.login(request); 
 	}
 
+	@PostMapping("/forgot-password")
+	public ResponseEntity<ApiResponse<?>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+		return service.forgotPassword(request);
+	}
+
+	@PostMapping("/reset-password")
+	public ResponseEntity<ApiResponse<?>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+		return service.resetPassword(request);
+	}
+
+	@PatchMapping("/{id}/admin-reset-password")
+	public ResponseEntity<ApiResponse<User>> adminResetPassword(
+			@PathVariable String id,
+			@Valid @RequestBody AdminResetPasswordRequest request) {
+		return service.adminResetPassword(id, request);
+	}
+
 	@GetMapping
 	public ResponseEntity<ApiResponse<List<User>>> getAllUsers(
 			@RequestParam(required = false) String role,

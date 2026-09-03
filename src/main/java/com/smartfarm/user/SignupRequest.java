@@ -10,5 +10,6 @@ public record SignupRequest(
 		String password, 
 		@NotNull @NotBlank(message = "confirm password required !")
 		String cpassword,
+		String email,
 		String role
 		) {}
