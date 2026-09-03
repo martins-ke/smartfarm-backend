@@ -388,13 +388,34 @@ public class UserService {
 		User user = userRepo.findById(id)
 			.orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
 
-		// If user is supervisor, unassign from supervised projects
+		if ("ADMIN".equalsIgnoreCase(user.getRole())) {
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Cannot delete the primary Administrator account!", false, Instant.now()));
+		}
+
+		// 1. Delete associated password reset token if exists
+		tokenRepo.findByUserId(id).ifPresent(tokenRepo::delete);
+
+		// 2. Clear assigned categories (join table)
+		if (user.getAssignedCategories() != null) {
+			user.getAssignedCategories().clear();
+			userRepo.saveAndFlush(user);
+		}
+
+		// 3. Unassign from supervised projects
 		List<Project> supervisedProjects = projectRepo.findBySupervisorId(id);
 		for (Project p : supervisedProjects) {
 			p.setSupervisor(null);
 			projectRepo.save(p);
 		}
 
+		// 4. Clear createdById reference for any users created by this user
+		List<User> createdUsers = userRepo.findByCreatedById(id);
+		for (User u : createdUsers) {
+			u.setCreatedById(null);
+			userRepo.save(u);
+		}
+
+		// 5. Delete the user
 		userRepo.delete(user);
 		return ResponseEntity.ok(new ApiResponse<>(null, "Account removed successfully", true, Instant.now()));
 	}
