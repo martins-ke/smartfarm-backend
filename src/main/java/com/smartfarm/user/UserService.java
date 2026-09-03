@@ -171,8 +171,7 @@ public class UserService {
 		User user = userRepo.findByEmail(email).orElse(null);
 		
 		if (user == null) {
-			// Don't leak that the user doesn't exist for security
-			return ResponseEntity.ok(new ApiResponse<>(null, "If the email exists, a reset link has been sent.", true, Instant.now()));
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "No account found with this email address. If you did not register an email, please contact your Farm Administrator to reset your password.", false, Instant.now()));
 		}
 
 		// Delete existing token if it exists
@@ -198,7 +197,7 @@ public class UserService {
 			return ResponseEntity.status(500).body(new ApiResponse<>(null, "Failed to send email. Check mail configuration.", false, Instant.now()));
 		}
 
-		return ResponseEntity.ok(new ApiResponse<>(null, "If the email exists, a reset link has been sent.", true, Instant.now()));
+		return ResponseEntity.ok(new ApiResponse<>(null, "Password reset link has been sent to your email. Please check your inbox.", true, Instant.now()));
 	}
 
 	@Transactional
