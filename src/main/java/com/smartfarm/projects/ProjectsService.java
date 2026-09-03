@@ -2,6 +2,7 @@ package com.smartfarm.projects;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
@@ -42,6 +43,10 @@ public class ProjectsService {
 	}
 	
 	public ResponseEntity<ApiResponse<Project>> createProject(CreateProjectRequest request){
+		if (request.startDate() != null && request.endDate() != null && request.startDate().isAfter(request.endDate())) {
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Start date cannot be greater than end date!", false, Instant.now()));
+		}
+
 		Category category = categoryRepo.findById(request.category_id()).orElseThrow(()-> new EntityNotFoundException("Category not in the system!"));
 		long count = projectRepo.count();
 		
@@ -155,6 +160,12 @@ public class ProjectsService {
 	public ResponseEntity<ApiResponse<Project>> updateProject(String id, UpdateProjectRequest request) {
 		Project project = projectRepo.findById(id)
 				.orElseThrow(() -> new EntityNotFoundException("Project not found: " + id));
+
+		LocalDate effectiveStart = request.startDate() != null ? request.startDate() : project.getStartDate();
+		LocalDate effectiveEnd = request.endDate() != null ? request.endDate() : project.getEndDate();
+		if (effectiveStart != null && effectiveEnd != null && effectiveStart.isAfter(effectiveEnd)) {
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Start date cannot be greater than end date!", false, Instant.now()));
+		}
 
 		if (request.name() != null)        project.setName(request.name());
 		if (request.season() != null)      project.setSeason(request.season());
