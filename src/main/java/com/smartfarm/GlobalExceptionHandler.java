@@ -55,8 +55,14 @@ public class GlobalExceptionHandler {
 	}
 	
 	@ExceptionHandler(DataIntegrityViolationException.class)
-	public ResponseEntity<ApiResponse<String>> dataIngegrityViolation(DataIntegrityViolationException ex){  
-		
-		return ResponseEntity.status(400).body(new ApiResponse<>(null, "Name must be unique!", false,Instant.now())); 
+	public ResponseEntity<ApiResponse<String>> dataIntegrityViolation(DataIntegrityViolationException ex) {  
+		String msg = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
+		if (msg != null && msg.toLowerCase().contains("foreign key constraint")) {
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Cannot delete or modify record because it is referenced by other items in the system.", false, Instant.now()));
+		}
+		if (msg != null && (msg.toLowerCase().contains("duplicate") || msg.toLowerCase().contains("unique"))) {
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "A record with this name or identifier already exists! Must be unique.", false, Instant.now()));
+		}
+		return ResponseEntity.status(400).body(new ApiResponse<>(null, "Database integrity constraint error: " + (msg != null ? msg : "Operation failed."), false, Instant.now())); 
 	}
 }
