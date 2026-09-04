@@ -32,8 +32,15 @@ public class ProjectsController {
 	}
 	
 	@PostMapping("/create")
-	public ResponseEntity<ApiResponse<Project>> createProject(@Valid @RequestBody CreateProjectRequest request){
-		return projectService.createProject(request);
+	public ResponseEntity<ApiResponse<Project>> createProject(
+			@Valid @RequestBody CreateProjectRequest request,
+			@RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@RequestParam(required = false) String userId,
+			@RequestParam(required = false) String userRole){
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return projectService.createProject(request, effectiveUserId, effectiveUserRole);
 	}
 	
 	@GetMapping("/{category_id}/{category}")

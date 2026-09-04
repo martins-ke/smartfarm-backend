@@ -43,7 +43,23 @@ public class ProjectsService {
 		this.userRepo = userRepo;
 	}
 	
-	public ResponseEntity<ApiResponse<Project>> createProject(CreateProjectRequest request){
+	public ResponseEntity<ApiResponse<Project>> createProject(CreateProjectRequest request, String userId, String userRole){
+		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Supervisors are not permitted to create projects.", false, Instant.now()));
+		}
+
+		if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
+			User manager = userRepo.findById(userId.trim()).orElse(null);
+			if (manager == null) {
+				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Manager not found.", false, Instant.now()));
+			}
+			boolean isAssigned = manager.getAssignedCategories().stream()
+					.anyMatch(c -> c.getId().equalsIgnoreCase(request.category_id()));
+			if (!isAssigned) {
+				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to manage this sector/category.", false, Instant.now()));
+			}
+		}
+
 		if (request.startDate() != null && request.endDate() != null && request.startDate().isAfter(request.endDate())) {
 			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Start date cannot be greater than end date!", false, Instant.now()));
 		}
@@ -64,6 +80,10 @@ public class ProjectsService {
 		Project p = new Project(id, request.name().trim(), request.season(), request.status(), request.startDate(), 
 						request.endDate(), request.budget(), request.description(), category);
 		return ResponseEntity.status(201).body(new ApiResponse<>(projectRepo.save(p), "Project created successfully", true, Instant.now())); 
+	}
+
+	public ResponseEntity<ApiResponse<Project>> createProject(CreateProjectRequest request) {
+		return createProject(request, null, null);
 	}
 	
 	public ResponseEntity<ApiResponse<Page<Project>>> getProjectsByCategoryId(String category_id, int page, int size, String userId, String userRole){

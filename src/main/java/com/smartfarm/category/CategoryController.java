@@ -30,8 +30,15 @@ public class CategoryController {
 	}
 	
 	@PostMapping("/create")
-	public ResponseEntity<ApiResponse<Category>> createCategory(@Valid @RequestBody CategoryRequest request){
-		return categoryService.createCategory(request); 
+	public ResponseEntity<ApiResponse<Category>> createCategory(
+			@Valid @RequestBody CategoryRequest request,
+			@RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@RequestParam(required = false) String userId,
+			@RequestParam(required = false) String userRole){
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return categoryService.createCategory(request, effectiveUserId, effectiveUserRole); 
 	}
 	
 	@GetMapping("/all")
