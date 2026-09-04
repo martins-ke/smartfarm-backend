@@ -58,8 +58,14 @@ public class UserController {
 	@PatchMapping("/{id}/admin-reset-password")
 	public ResponseEntity<ApiResponse<User>> adminResetPassword(
 			@PathVariable String id,
-			@Valid @RequestBody AdminResetPasswordRequest request) {
-		return service.adminResetPassword(id, request);
+			@Valid @RequestBody AdminResetPasswordRequest request,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@RequestParam(required = false) String userId,
+			@RequestParam(required = false) String userRole) {
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return service.adminResetPassword(id, request, effectiveUserId, effectiveUserRole);
 	}
 
 	@GetMapping
@@ -76,36 +82,67 @@ public class UserController {
 	}
 
 	@PostMapping("/create")
-	public ResponseEntity<ApiResponse<User>> createStaff(@Valid @RequestBody CreateStaffRequest request) {
-		return service.createStaff(request);
+	public ResponseEntity<ApiResponse<User>> createStaff(
+			@Valid @RequestBody CreateStaffRequest request,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@RequestParam(required = false) String userId,
+			@RequestParam(required = false) String userRole) {
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return service.createStaff(request, effectiveUserId, effectiveUserRole);
 	}
 
 	@PatchMapping("/{id}/status")
 	public ResponseEntity<ApiResponse<User>> updateUserStatus(
 			@PathVariable String id,
-			@Valid @RequestBody UpdateUserStatusRequest request) {
-		return service.updateUserStatus(id, request);
+			@Valid @RequestBody UpdateUserStatusRequest request,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@RequestParam(required = false) String userId,
+			@RequestParam(required = false) String userRole) {
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return service.updateUserStatus(id, request, effectiveUserId, effectiveUserRole);
 	}
 
 	@PatchMapping("/{id}/privileges")
 	public ResponseEntity<ApiResponse<User>> updatePrivileges(
 			@PathVariable String id,
-			@RequestBody UpdatePrivilegesRequest request) {
-		return service.updatePrivileges(id, request);
+			@RequestBody UpdatePrivilegesRequest request,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@RequestParam(required = false) String userId,
+			@RequestParam(required = false) String userRole) {
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return service.updatePrivileges(id, request, effectiveUserId, effectiveUserRole);
 	}
 
 	@PutMapping("/{id}/categories")
 	public ResponseEntity<ApiResponse<User>> assignCategories(
 			@PathVariable String id,
-			@RequestBody AssignCategoriesRequest request) {
-		return service.assignCategories(id, request);
+			@RequestBody AssignCategoriesRequest request,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@RequestParam(required = false) String userId,
+			@RequestParam(required = false) String userRole) {
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return service.assignCategories(id, request, effectiveUserId, effectiveUserRole);
 	}
 
 	@PutMapping("/{id}/projects")
 	public ResponseEntity<ApiResponse<Void>> assignProjects(
 			@PathVariable String id,
-			@RequestBody AssignProjectsRequest request) {
-		return service.assignProjectsToSupervisor(id, request);
+			@RequestBody AssignProjectsRequest request,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@RequestParam(required = false) String userId,
+			@RequestParam(required = false) String userRole) {
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return service.assignProjectsToSupervisor(id, request, effectiveUserId, effectiveUserRole);
 	}
 
 	@GetMapping("/{id}/projects")
@@ -122,7 +159,14 @@ public class UserController {
 	}
 
 	@DeleteMapping("/{id}")
-	public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable String id) {
-		return service.deleteUser(id);
+	public ResponseEntity<ApiResponse<Void>> deleteUser(
+			@PathVariable String id,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@RequestParam(required = false) String userId,
+			@RequestParam(required = false) String userRole) {
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return service.deleteUser(id, effectiveUserId, effectiveUserRole);
 	}
 }

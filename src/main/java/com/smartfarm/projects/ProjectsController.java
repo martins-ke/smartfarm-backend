@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -116,28 +117,53 @@ public class ProjectsController {
 	@PatchMapping("/{id}/status")
 	public ResponseEntity<ApiResponse<Project>> updateProjectStatus(
 			@PathVariable String id,
-			@RequestBody UpdateStatusRequest request) {
-		return projectService.updateProjectStatus(id, request);
+			@RequestBody UpdateStatusRequest request,
+			@RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@RequestParam(required = false) String userId,
+			@RequestParam(required = false) String userRole) {
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return projectService.updateProjectStatus(id, request, effectiveUserId, effectiveUserRole);
 	}
 
 	/** PUT /projects/{id}  –  update any project fields */
 	@PutMapping("/{id}")
 	public ResponseEntity<ApiResponse<Project>> updateProject(
 			@PathVariable String id,
-			@RequestBody UpdateProjectRequest request) {
-		return projectService.updateProject(id, request);
+			@RequestBody UpdateProjectRequest request,
+			@RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@RequestParam(required = false) String userId,
+			@RequestParam(required = false) String userRole) {
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return projectService.updateProject(id, request, effectiveUserId, effectiveUserRole);
 	}
 
 	/** PATCH /projects/{id}/assign-supervisor */
 	@PatchMapping("/{id}/assign-supervisor")
 	public ResponseEntity<ApiResponse<Project>> assignSupervisor(
 			@PathVariable String id,
-			@RequestBody AssignSupervisorRequest request) {
-		return projectService.assignSupervisor(id, request);
+			@RequestBody AssignSupervisorRequest request,
+			@RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@RequestParam(required = false) String userId,
+			@RequestParam(required = false) String userRole) {
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return projectService.assignSupervisor(id, request, effectiveUserId, effectiveUserRole);
 	}
 
-	@org.springframework.web.bind.annotation.DeleteMapping("/{id}")
-	public ResponseEntity<ApiResponse<Void>> deleteProject(@PathVariable String id) {
-		return projectService.deleteProject(id);
+	@DeleteMapping("/{id}")
+	public ResponseEntity<ApiResponse<Void>> deleteProject(
+			@PathVariable String id,
+			@RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@RequestParam(required = false) String userId,
+			@RequestParam(required = false) String userRole) {
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return projectService.deleteProject(id, effectiveUserId, effectiveUserRole);
 	}
 }

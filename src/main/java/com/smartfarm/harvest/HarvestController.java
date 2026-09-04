@@ -20,19 +20,39 @@ final class HarvestController {
 	}
 	
 	@PostMapping("/record")
-	final ResponseEntity<ApiResponse<Harvest>> recordHarvest(@Valid @RequestBody CreateHarvestRequest request){
-		return harvestService.recordHarvest(request); 
+	final ResponseEntity<ApiResponse<Harvest>> recordHarvest(
+			@Valid @RequestBody CreateHarvestRequest request,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@org.springframework.web.bind.annotation.RequestParam(required = false) String userId,
+			@org.springframework.web.bind.annotation.RequestParam(required = false) String userRole){
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return harvestService.recordHarvest(request, effectiveUserId, effectiveUserRole); 
 	}
 
 	@org.springframework.web.bind.annotation.PutMapping("/{id}")
 	final ResponseEntity<ApiResponse<Harvest>> updateHarvest(
 			@org.springframework.web.bind.annotation.PathVariable String id,
-			@Valid @RequestBody UpdateHarvestRequest request) {
-		return harvestService.updateHarvest(id, request);
+			@Valid @RequestBody UpdateHarvestRequest request,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@org.springframework.web.bind.annotation.RequestParam(required = false) String userId,
+			@org.springframework.web.bind.annotation.RequestParam(required = false) String userRole) {
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return harvestService.updateHarvest(id, request, effectiveUserId, effectiveUserRole);
 	}
 
 	@org.springframework.web.bind.annotation.DeleteMapping("/{id}")
-	final ResponseEntity<ApiResponse<Void>> deleteHarvest(@org.springframework.web.bind.annotation.PathVariable String id) {
-		return harvestService.deleteHarvest(id);
+	final ResponseEntity<ApiResponse<Void>> deleteHarvest(
+			@org.springframework.web.bind.annotation.PathVariable String id,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@org.springframework.web.bind.annotation.RequestParam(required = false) String userId,
+			@org.springframework.web.bind.annotation.RequestParam(required = false) String userRole) {
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return harvestService.deleteHarvest(id, effectiveUserId, effectiveUserRole);
 	}
 }

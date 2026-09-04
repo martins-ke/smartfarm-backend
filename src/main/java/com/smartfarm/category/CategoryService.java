@@ -67,7 +67,26 @@ public class CategoryService {
 		return ResponseEntity.status(200).body(new ApiResponse<>(categoryRepo.findAll(), null, true, Instant.now())); 
 	}
 
-	public ResponseEntity<ApiResponse<Category>> updateCategory(String id, CategoryRequest request) {
+	public ResponseEntity<ApiResponse<Category>> updateCategory(String id, CategoryRequest request, String userId, String userRole) {
+		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot edit categories.", false, Instant.now()));
+		}
+
+		if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
+			com.smartfarm.user.User manager = userRepo.findById(userId.trim()).orElse(null);
+			if (manager == null) {
+				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Manager not found.", false, Instant.now()));
+			}
+			boolean isAssigned = manager.getAssignedCategories().stream()
+					.anyMatch(c -> c.getId().equalsIgnoreCase(id));
+			if (!isAssigned) {
+				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to manage this category.", false, Instant.now()));
+			}
+			if (manager.getPrivileges() == null || !manager.getPrivileges().contains("CAN_CREATE_CATEGORIES")) {
+				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You do not have privilege to configure categories.", false, Instant.now()));
+			}
+		}
+
 		Category category = categoryRepo.findById(id)
 				.orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Category not found with ID: " + id));
 
@@ -87,11 +106,28 @@ public class CategoryService {
 		return ResponseEntity.ok(new ApiResponse<>(saved, "Category updated successfully ✅", true, Instant.now()));
 	}
 
-	public ResponseEntity<ApiResponse<Void>> deleteCategory(String id) {
+	public ResponseEntity<ApiResponse<Category>> updateCategory(String id, CategoryRequest request) {
+		return updateCategory(id, request, null, null);
+	}
+
+	public ResponseEntity<ApiResponse<Void>> deleteCategory(String id, String userId, String userRole) {
+		if (!"ADMIN".equalsIgnoreCase(userRole)) {
+			if (userId != null && !userId.trim().isEmpty()) {
+				com.smartfarm.user.User caller = userRepo.findById(userId.trim()).orElse(null);
+				if (caller == null || !"ADMIN".equalsIgnoreCase(caller.getRole())) {
+					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Only Administrators can delete categories.", false, Instant.now()));
+				}
+			}
+		}
+
 		Category category = categoryRepo.findById(id)
 				.orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Category not found with ID: " + id));
 
 		categoryRepo.delete(category);
 		return ResponseEntity.ok(new ApiResponse<>(null, "Category deleted successfully", true, Instant.now()));
+	}
+
+	public ResponseEntity<ApiResponse<Void>> deleteCategory(String id) {
+		return deleteCategory(id, null, null);
 	}
 }

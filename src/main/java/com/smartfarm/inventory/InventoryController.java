@@ -38,15 +38,28 @@ public class InventoryController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<InventoryItem>> createItem(@Valid @RequestBody CreateInventoryItemRequest request) {
-        return inventoryService.createItem(request);
+    public ResponseEntity<ApiResponse<InventoryItem>> createItem(
+            @Valid @RequestBody CreateInventoryItemRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+            @RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+            @RequestParam(required = false) String userId,
+            @RequestParam(required = false) String userRole) {
+        String effectiveUserId = userId != null ? userId : headerUserId;
+        String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+        return inventoryService.createItem(request, effectiveUserId, effectiveUserRole);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<InventoryItem>> updateItem(
             @PathVariable("id") String id, 
-            @Valid @RequestBody CreateInventoryItemRequest request) {
-        return inventoryService.updateItem(id, request);
+            @Valid @RequestBody CreateInventoryItemRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+            @RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+            @RequestParam(required = false) String userId,
+            @RequestParam(required = false) String userRole) {
+        String effectiveUserId = userId != null ? userId : headerUserId;
+        String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+        return inventoryService.updateItem(id, request, effectiveUserId, effectiveUserRole);
     }
 
     @DeleteMapping("/{id}")
@@ -64,7 +77,13 @@ public class InventoryController {
     @PostMapping("/{id}/use")
     public ResponseEntity<ApiResponse<Expense>> useItem(
             @PathVariable("id") String id, 
-            @Valid @RequestBody UseInventoryRequest request) {
-        return inventoryService.useItem(id, request);
+            @Valid @RequestBody UseInventoryRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+            @RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+            @RequestParam(required = false) String userId,
+            @RequestParam(required = false) String userRole) {
+        String effectiveUserId = userId != null ? userId : headerUserId;
+        String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+        return inventoryService.useItem(id, request, effectiveUserId, effectiveUserRole);
     }
 }

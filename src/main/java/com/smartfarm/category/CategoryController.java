@@ -57,12 +57,25 @@ public class CategoryController {
 	@org.springframework.web.bind.annotation.PutMapping("/{id}")
 	public ResponseEntity<ApiResponse<Category>> updateCategory(
 			@PathVariable String id,
-			@Valid @RequestBody CategoryRequest request) {
-		return categoryService.updateCategory(id, request);
+			@Valid @RequestBody CategoryRequest request,
+			@RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@RequestParam(required = false) String userId,
+			@RequestParam(required = false) String userRole) {
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return categoryService.updateCategory(id, request, effectiveUserId, effectiveUserRole);
 	}
 
 	@org.springframework.web.bind.annotation.DeleteMapping("/{id}")
-	public ResponseEntity<ApiResponse<Void>> deleteCategory(@PathVariable String id) {
-		return categoryService.deleteCategory(id);
+	public ResponseEntity<ApiResponse<Void>> deleteCategory(
+			@PathVariable String id,
+			@RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@RequestParam(required = false) String userId,
+			@RequestParam(required = false) String userRole) {
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return categoryService.deleteCategory(id, effectiveUserId, effectiveUserRole);
 	}
 }

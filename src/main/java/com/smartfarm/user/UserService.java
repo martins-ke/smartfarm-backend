@@ -226,7 +226,16 @@ public class UserService {
 	}
 
 	@Transactional
-	public ResponseEntity<ApiResponse<User>> adminResetPassword(String userId, AdminResetPasswordRequest request) {
+	public ResponseEntity<ApiResponse<User>> adminResetPassword(String userId, AdminResetPasswordRequest request, String callerUserId, String callerUserRole) {
+		if (!"ADMIN".equalsIgnoreCase(callerUserRole)) {
+			if (callerUserId != null && !callerUserId.trim().isEmpty()) {
+				User caller = userRepo.findById(callerUserId.trim()).orElse(null);
+				if (caller == null || !"ADMIN".equalsIgnoreCase(caller.getRole())) {
+					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Only Administrators can reset passwords for other accounts.", false, Instant.now()));
+				}
+			}
+		}
+
 		User user = userRepo.findById(userId)
 				.orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
 
@@ -234,6 +243,11 @@ public class UserService {
 		userRepo.save(user);
 
 		return ResponseEntity.ok(new ApiResponse<>(user, "Password has been successfully updated by Admin.", true, Instant.now()));
+	}
+
+	@Transactional
+	public ResponseEntity<ApiResponse<User>> adminResetPassword(String userId, AdminResetPasswordRequest request) {
+		return adminResetPassword(userId, request, null, null);
 	}
 
 	public ResponseEntity<ApiResponse<List<User>>> getAllUsers(String role, String createdById, String managerId) {
@@ -257,10 +271,34 @@ public class UserService {
 	}
 
 	@Transactional
-	public ResponseEntity<ApiResponse<User>> createStaff(CreateStaffRequest request) {
+	public ResponseEntity<ApiResponse<User>> createStaff(CreateStaffRequest request, String callerUserId, String callerUserRole) {
 		String username = request.username().trim();
 		String password = request.password().trim();
 		String role = request.role().trim().toUpperCase();
+
+		String effectiveCallerRole = callerUserRole;
+		User caller = null;
+		if (callerUserId != null && !callerUserId.trim().isEmpty()) {
+			caller = userRepo.findById(callerUserId.trim()).orElse(null);
+			if (caller != null && effectiveCallerRole == null) {
+				effectiveCallerRole = caller.getRole();
+			}
+		}
+
+		if ("SUPERVISOR".equalsIgnoreCase(effectiveCallerRole)) {
+			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot create or provision staff accounts.", false, Instant.now()));
+		}
+
+		if ("MANAGER".equalsIgnoreCase(effectiveCallerRole)) {
+			if ("MANAGER".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role)) {
+				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Only Administrators can create Manager accounts.", false, Instant.now()));
+			}
+			if ("SUPERVISOR".equalsIgnoreCase(role)) {
+				if (caller != null && (caller.getPrivileges() == null || !caller.getPrivileges().contains("CAN_CREATE_SUPERVISORS"))) {
+					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You do not have privilege to create and provision supervisors.", false, Instant.now()));
+				}
+			}
+		}
 
 		if (userRepo.existsByUsername(username)) {
 			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Username already in use.", false, Instant.now()));
@@ -293,21 +331,35 @@ public class UserService {
 		}
 
 		String hashedPassword = passwordEncoder.encode(password);
-		User user = new User(id, username, email, hashedPassword, role, "ACTIVE", request.createdById());
-		if ("SUPERVISOR".equalsIgnoreCase(role) && request.createdById() != null) {
-			userRepo.findById(request.createdById()).ifPresent(creator -> {
-				if ("MANAGER".equalsIgnoreCase(creator.getRole())) {
-					user.setManagerId(creator.getId());
-				}
-			});
+		String creatorId = request.createdById() != null ? request.createdById() : (caller != null ? caller.getId() : null);
+		User user = new User(id, username, email, hashedPassword, role, "ACTIVE", creatorId);
+
+		if ("SUPERVISOR".equalsIgnoreCase(role)) {
+			if (caller != null && "MANAGER".equalsIgnoreCase(caller.getRole())) {
+				user.setManagerId(caller.getId());
+			} else if (creatorId != null) {
+				userRepo.findById(creatorId).ifPresent(c -> {
+					if ("MANAGER".equalsIgnoreCase(c.getRole())) {
+						user.setManagerId(c.getId());
+					}
+				});
+			}
 		}
 		User saved = userRepo.save(user);
 
 		return ResponseEntity.status(201).body(new ApiResponse<>(saved, role + " created and activated successfully.", true, Instant.now()));
 	}
 
+	public ResponseEntity<ApiResponse<User>> createStaff(CreateStaffRequest request) {
+		return createStaff(request, null, null);
+	}
+
 	@Transactional
-	public ResponseEntity<ApiResponse<User>> updateUserStatus(String id, UpdateUserStatusRequest request) {
+	public ResponseEntity<ApiResponse<User>> updateUserStatus(String id, UpdateUserStatusRequest request, String callerUserId, String callerUserRole) {
+		if ("SUPERVISOR".equalsIgnoreCase(callerUserRole)) {
+			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot modify account status.", false, Instant.now()));
+		}
+
 		User user = userRepo.findById(id)
 			.orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
 
@@ -318,8 +370,21 @@ public class UserService {
 		return ResponseEntity.ok(new ApiResponse<>(saved, "User status updated to " + newStatus, true, Instant.now()));
 	}
 
+	public ResponseEntity<ApiResponse<User>> updateUserStatus(String id, UpdateUserStatusRequest request) {
+		return updateUserStatus(id, request, null, null);
+	}
+
 	@Transactional
-	public ResponseEntity<ApiResponse<User>> assignCategories(String id, AssignCategoriesRequest request) {
+	public ResponseEntity<ApiResponse<User>> assignCategories(String id, AssignCategoriesRequest request, String callerUserId, String callerUserRole) {
+		if (!"ADMIN".equalsIgnoreCase(callerUserRole)) {
+			if (callerUserId != null && !callerUserId.trim().isEmpty()) {
+				User caller = userRepo.findById(callerUserId.trim()).orElse(null);
+				if (caller == null || !"ADMIN".equalsIgnoreCase(caller.getRole())) {
+					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Only Administrators can assign categories to managers.", false, Instant.now()));
+				}
+			}
+		}
+
 		User user = userRepo.findById(id)
 			.orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
 
@@ -341,8 +406,16 @@ public class UserService {
 		return ResponseEntity.ok(new ApiResponse<>(saved, msg, true, Instant.now()));
 	}
 
+	public ResponseEntity<ApiResponse<User>> assignCategories(String id, AssignCategoriesRequest request) {
+		return assignCategories(id, request, null, null);
+	}
+
 	@Transactional
-	public ResponseEntity<ApiResponse<Void>> assignProjectsToSupervisor(String supervisorId, AssignProjectsRequest request) {
+	public ResponseEntity<ApiResponse<Void>> assignProjectsToSupervisor(String supervisorId, AssignProjectsRequest request, String callerUserId, String callerUserRole) {
+		if ("SUPERVISOR".equalsIgnoreCase(callerUserRole)) {
+			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot assign projects.", false, Instant.now()));
+		}
+
 		String trimmedId = supervisorId != null ? supervisorId.trim() : "";
 		User supervisor = userRepo.findById(trimmedId)
 			.orElseThrow(() -> new EntityNotFoundException("Supervisor not found: " + supervisorId));
@@ -377,8 +450,21 @@ public class UserService {
 		return ResponseEntity.ok(new ApiResponse<>(null, "Projects assigned to " + supervisor.getUsername() + " successfully.", true, Instant.now()));
 	}
 
+	public ResponseEntity<ApiResponse<Void>> assignProjectsToSupervisor(String supervisorId, AssignProjectsRequest request) {
+		return assignProjectsToSupervisor(supervisorId, request, null, null);
+	}
+
 	@Transactional
-	public ResponseEntity<ApiResponse<User>> updatePrivileges(String id, UpdatePrivilegesRequest request) {
+	public ResponseEntity<ApiResponse<User>> updatePrivileges(String id, UpdatePrivilegesRequest request, String callerUserId, String callerUserRole) {
+		if (!"ADMIN".equalsIgnoreCase(callerUserRole)) {
+			if (callerUserId != null && !callerUserId.trim().isEmpty()) {
+				User caller = userRepo.findById(callerUserId.trim()).orElse(null);
+				if (caller == null || !"ADMIN".equalsIgnoreCase(caller.getRole())) {
+					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Only Administrators can update user privileges.", false, Instant.now()));
+				}
+			}
+		}
+
 		User user = userRepo.findById(id)
 			.orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
 
@@ -391,6 +477,10 @@ public class UserService {
 
 		User saved = userRepo.save(user);
 		return ResponseEntity.ok(new ApiResponse<>(saved, "Privileges updated successfully for " + user.getUsername(), true, Instant.now()));
+	}
+
+	public ResponseEntity<ApiResponse<User>> updatePrivileges(String id, UpdatePrivilegesRequest request) {
+		return updatePrivileges(id, request, null, null);
 	}
 
 	public ResponseEntity<ApiResponse<List<Project>>> getSupervisorProjects(String supervisorId) {
@@ -425,7 +515,16 @@ public class UserService {
 	}
 
 	@Transactional
-	public ResponseEntity<ApiResponse<Void>> deleteUser(String id) {
+	public ResponseEntity<ApiResponse<Void>> deleteUser(String id, String callerUserId, String callerUserRole) {
+		if (!"ADMIN".equalsIgnoreCase(callerUserRole)) {
+			if (callerUserId != null && !callerUserId.trim().isEmpty()) {
+				User caller = userRepo.findById(callerUserId.trim()).orElse(null);
+				if (caller == null || !"ADMIN".equalsIgnoreCase(caller.getRole())) {
+					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Only Administrators can delete accounts.", false, Instant.now()));
+				}
+			}
+		}
+
 		User user = userRepo.findById(id)
 			.orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
 
@@ -459,5 +558,10 @@ public class UserService {
 		// 5. Delete the user
 		userRepo.delete(user);
 		return ResponseEntity.ok(new ApiResponse<>(null, "Account removed successfully", true, Instant.now()));
+	}
+
+	@Transactional
+	public ResponseEntity<ApiResponse<Void>> deleteUser(String id) {
+		return deleteUser(id, null, null);
 	}
 }

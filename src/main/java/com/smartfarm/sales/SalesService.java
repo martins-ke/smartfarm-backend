@@ -31,19 +31,43 @@ public class SalesService {
 	private final CustomerRepository customerRepo;
 	private final CustomerService customerService;
 	private final HarvestRepository harvestRepo;
+	private final com.smartfarm.user.UserRepository userRepo;
 	
-	public SalesService(SalesRepository salesRepo, ProjectRepository projectRepo, CustomerRepository customerRepo, CustomerService customerService, HarvestRepository harvestRepo) {
+	public SalesService(SalesRepository salesRepo, ProjectRepository projectRepo, CustomerRepository customerRepo, CustomerService customerService, HarvestRepository harvestRepo, com.smartfarm.user.UserRepository userRepo) {
 		this.salesRepo = salesRepo;
 		this.projectRepo = projectRepo;
 		this.customerRepo = customerRepo;
 		this.customerService = customerService;
 		this.harvestRepo = harvestRepo;
+		this.userRepo = userRepo;
 	}
 	
 	@Transactional
-	public ResponseEntity<ApiResponse<Sale>> createSale(CreateSaleRequest request) {
+	public ResponseEntity<ApiResponse<Sale>> createSale(CreateSaleRequest request, String userId, String userRole) {
 		Project project = projectRepo.findById(request.project_id())
 				.orElseThrow(() -> new EntityNotFoundException("Project not in the system!"));
+
+		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+			boolean isAssigned = project.getSupervisor() != null && userId != null && userId.trim().equals(project.getSupervisor().getId());
+			if (!isAssigned) {
+				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to supervise this project.", false, Instant.now()));
+			}
+			if (userId != null) {
+				com.smartfarm.user.User sup = userRepo.findById(userId.trim()).orElse(null);
+				if (sup == null || sup.getPrivileges() == null || !sup.getPrivileges().contains("CAN_RECORD_SALES")) {
+					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You do not have privilege to record farm-gate sales.", false, Instant.now()));
+				}
+			}
+		} else if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
+			com.smartfarm.user.User manager = userRepo.findById(userId.trim()).orElse(null);
+			if (manager != null) {
+				boolean isAssigned = manager.getAssignedCategories().stream()
+						.anyMatch(c -> c.getId().equalsIgnoreCase(project.getCategory().getId()));
+				if (!isAssigned) {
+					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to manage the category for this project.", false, Instant.now()));
+				}
+			}
+		}
 		
 		// Enforce business rule: A project MUST have enough harvested quantity to cover the sale
 		float totalHarvested = harvestRepo.totalHarvestQuantityByProjectId(project.getId());
@@ -88,7 +112,7 @@ public class SalesService {
 					customer = customerRepo.findByIdNumber(idNumber).orElse(null);
 				}
 				if (customer == null) {
-					customer = customerService.saveCustomer(request.customer());
+					return ResponseEntity.status(400).body(new ApiResponse<>(null, "Customer with provided contact or ID number not found in existing records!", false, Instant.now()));
 				}
 			}
 		}
@@ -97,14 +121,44 @@ public class SalesService {
 		return ResponseEntity.status(201).body(new ApiResponse<>(salesRepo.save(sale), "Sale recorded successfully ✅", true, Instant.now()));  
 	}
 
-	public ResponseEntity<ApiResponse<Page<Sale>>> getAllSales(int page, int size) {
+	public ResponseEntity<ApiResponse<Sale>> createSale(CreateSaleRequest request) {
+		return createSale(request, null, null);
+	}
+
+	public ResponseEntity<ApiResponse<Page<Sale>>> getAllSales(int page, int size, String userId, String userRole) {
+		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+			return ResponseEntity.status(200).body(new ApiResponse<>(org.springframework.data.domain.Page.empty(), "Sales records shielded for supervisor.", true, Instant.now()));
+		}
+		if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
+			com.smartfarm.user.User manager = userRepo.findById(userId.trim()).orElse(null);
+			if (manager != null && (manager.getPrivileges() == null || !manager.getPrivileges().contains("CAN_VIEW_FINANCIALS"))) {
+				return ResponseEntity.status(200).body(new ApiResponse<>(org.springframework.data.domain.Page.empty(), "Financial privileges required to view sales.", true, Instant.now()));
+			}
+		}
 		Pageable pageable = PageRequest.of(page, size, Sort.by("added_on").descending());
 		return ResponseEntity.status(200).body(new ApiResponse<>(salesRepo.findAll(pageable), "Sales fetched successfully", true, Instant.now()));
 	}
 
-	public ResponseEntity<ApiResponse<Page<Sale>>> getSalesByProjectId(String projectId, int page, int size) {
+	public ResponseEntity<ApiResponse<Page<Sale>>> getAllSales(int page, int size) {
+		return getAllSales(page, size, null, null);
+	}
+
+	public ResponseEntity<ApiResponse<Page<Sale>>> getSalesByProjectId(String projectId, int page, int size, String userId, String userRole) {
+		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+			return ResponseEntity.status(200).body(new ApiResponse<>(org.springframework.data.domain.Page.empty(), "Sales records shielded for supervisor.", true, Instant.now()));
+		}
+		if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
+			com.smartfarm.user.User manager = userRepo.findById(userId.trim()).orElse(null);
+			if (manager != null && (manager.getPrivileges() == null || !manager.getPrivileges().contains("CAN_VIEW_FINANCIALS"))) {
+				return ResponseEntity.status(200).body(new ApiResponse<>(org.springframework.data.domain.Page.empty(), "Financial privileges required to view sales.", true, Instant.now()));
+			}
+		}
 		Pageable pageable = PageRequest.of(page, size, Sort.by("added_on").descending());
 		return ResponseEntity.status(200).body(new ApiResponse<>(salesRepo.findByProjectId(projectId, pageable), "Sales retrieved successfully", true, Instant.now()));
+	}
+
+	public ResponseEntity<ApiResponse<Page<Sale>>> getSalesByProjectId(String projectId, int page, int size) {
+		return getSalesByProjectId(projectId, page, size, null, null);
 	}
 
 	public ResponseEntity<ApiResponse<Sale>> getSaleById(String id) {
@@ -113,7 +167,10 @@ public class SalesService {
 	}
 
 	@Transactional
-	public ResponseEntity<ApiResponse<Void>> deleteSale(String id) {
+	public ResponseEntity<ApiResponse<Void>> deleteSale(String id, String userId, String userRole) {
+		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot delete sales.", false, Instant.now()));
+		}
 		if (!salesRepo.existsById(id)) {
 			throw new EntityNotFoundException("Sale not found with id: " + id);
 		}
@@ -121,8 +178,16 @@ public class SalesService {
 		return ResponseEntity.status(200).body(new ApiResponse<>(null, "Sale deleted successfully", true, Instant.now()));
 	}
 
+	public ResponseEntity<ApiResponse<Void>> deleteSale(String id) {
+		return deleteSale(id, null, null);
+	}
+
 	@Transactional
-	public ResponseEntity<ApiResponse<Sale>> updateSale(String id, UpdateSaleRequest request) {
+	public ResponseEntity<ApiResponse<Sale>> updateSale(String id, UpdateSaleRequest request, String userId, String userRole) {
+		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot edit sales records.", false, Instant.now()));
+		}
+
 		Sale sale = salesRepo.findById(id)
 				.orElseThrow(() -> new EntityNotFoundException("Sale not found with id: " + id));
 
@@ -141,5 +206,9 @@ public class SalesService {
 
 		Sale saved = salesRepo.save(sale);
 		return ResponseEntity.ok(new ApiResponse<>(saved, "Sale updated successfully ✅", true, Instant.now()));
+	}
+
+	public ResponseEntity<ApiResponse<Sale>> updateSale(String id, UpdateSaleRequest request) {
+		return updateSale(id, request, null, null);
 	}
 }

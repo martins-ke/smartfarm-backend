@@ -10,7 +10,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-
 import org.springframework.transaction.annotation.Transactional;
 
 import com.smartfarm.ApiResponse;
@@ -19,7 +18,6 @@ import com.smartfarm.expenses.ExpenseRepository;
 import com.smartfarm.projects.Project;
 import com.smartfarm.projects.ProjectRepository;
 import com.smartfarm.util.IdGenarator;
-
 import com.smartfarm.user.User;
 import com.smartfarm.user.UserRepository;
 
@@ -46,23 +44,40 @@ public class InventoryService {
         return ResponseEntity.ok(new ApiResponse<>(result, "Inventory retrieved", true, Instant.now()));
     }
 
-    public ResponseEntity<ApiResponse<InventoryItem>> createItem(CreateInventoryItemRequest request) {
+    public ResponseEntity<ApiResponse<InventoryItem>> createItem(CreateInventoryItemRequest request, String userId, String userRole) {
+        if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+            return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot create inventory catalog items.", false, Instant.now()));
+        }
+
         long count = inventoryRepo.count();
         String id = IdGenarator.generateId(request.name(), count);
         while (inventoryRepo.existsById(id)) {
             count++;
             id = IdGenarator.generateId(request.name(), count);
         }
-        
+
         InventoryItem item = new InventoryItem(
-            id, request.name(), request.category(), request.unit(), 
-            request.quantityInStock(), request.unitPrice(), request.minStockLevel()
+            id,
+            request.name(),
+            request.category(),
+            request.unit(),
+            request.quantityInStock(),
+            request.unitPrice(),
+            request.minStockLevel()
         );
         
         return ResponseEntity.status(201).body(new ApiResponse<>(inventoryRepo.save(item), "Inventory item added", true, Instant.now()));
     }
 
-    public ResponseEntity<ApiResponse<InventoryItem>> updateItem(String id, CreateInventoryItemRequest request) {
+    public ResponseEntity<ApiResponse<InventoryItem>> createItem(CreateInventoryItemRequest request) {
+        return createItem(request, null, null);
+    }
+
+    public ResponseEntity<ApiResponse<InventoryItem>> updateItem(String id, CreateInventoryItemRequest request, String userId, String userRole) {
+        if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+            return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot edit inventory catalog items.", false, Instant.now()));
+        }
+
         InventoryItem item = inventoryRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Inventory item not found!"));
         
@@ -72,9 +87,13 @@ public class InventoryService {
         item.setQuantityInStock(request.quantityInStock());
         item.setUnitPrice(request.unitPrice());
         item.setMinStockLevel(request.minStockLevel());
-        item.setLastRestocked(LocalDate.now()); // Update restock date on edit
+        item.setLastRestocked(LocalDate.now());
         
         return ResponseEntity.ok(new ApiResponse<>(inventoryRepo.save(item), "Inventory item updated", true, Instant.now()));
+    }
+
+    public ResponseEntity<ApiResponse<InventoryItem>> updateItem(String id, CreateInventoryItemRequest request) {
+        return updateItem(id, request, null, null);
     }
 
     public ResponseEntity<ApiResponse<Void>> deleteItem(String id) {
@@ -110,12 +129,34 @@ public class InventoryService {
     }
 
     @Transactional
-    public ResponseEntity<ApiResponse<Expense>> useItem(String id, UseInventoryRequest request) {
+    public ResponseEntity<ApiResponse<Expense>> useItem(String id, UseInventoryRequest request, String userId, String userRole) {
         InventoryItem item = inventoryRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Inventory item not found"));
                 
         Project project = projectRepo.findById(request.projectId())
                 .orElseThrow(() -> new EntityNotFoundException("Project not found"));
+
+        if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+            boolean isAssigned = project.getSupervisor() != null && userId != null && userId.trim().equals(project.getSupervisor().getId());
+            if (!isAssigned) {
+                return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to supervise this project.", false, Instant.now()));
+            }
+            if (userId != null) {
+                User sup = userRepo.findById(userId.trim()).orElse(null);
+                if (sup == null || sup.getPrivileges() == null || !sup.getPrivileges().contains("CAN_USE_INVENTORY")) {
+                    return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You do not have privilege to deduct inventory stock.", false, Instant.now()));
+                }
+            }
+        } else if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
+            User manager = userRepo.findById(userId.trim()).orElse(null);
+            if (manager != null) {
+                boolean isAssigned = manager.getAssignedCategories().stream()
+                        .anyMatch(c -> c.getId().equalsIgnoreCase(project.getCategory().getId()));
+                if (!isAssigned) {
+                    return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to manage the category for this project.", false, Instant.now()));
+                }
+            }
+        }
                 
         if (item.getQuantityInStock().compareTo(request.quantity()) < 0) {
             throw new IllegalArgumentException("Not enough stock available. Current stock: " + item.getQuantityInStock());
@@ -145,5 +186,9 @@ public class InventoryService {
         Expense savedExpense = expenseRepo.save(expense);
         
         return ResponseEntity.ok(new ApiResponse<>(savedExpense, "Supplies used and expense recorded !", true, Instant.now()));
+    }
+
+    public ResponseEntity<ApiResponse<Expense>> useItem(String id, UseInventoryRequest request) {
+        return useItem(id, request, null, null);
     }
 }

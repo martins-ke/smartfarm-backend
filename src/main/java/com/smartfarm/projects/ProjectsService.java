@@ -114,16 +114,38 @@ public class ProjectsService {
 			}
 		}
 
-		boolean isSupervisor = "SUPERVISOR".equalsIgnoreCase(userRole);
-		BigDecimal totalExpenses = isSupervisor ? BigDecimal.ZERO : expenseRepo.totalExpensesByProjectId(id);
-		BigDecimal totalSales = isSupervisor ? BigDecimal.ZERO : salesRepo.totalSalesByProjectId(id);
-		BigDecimal netValue = isSupervisor ? BigDecimal.ZERO : totalSales.subtract(totalExpenses);
-		BigDecimal displayBudget = isSupervisor ? BigDecimal.ZERO : project.getBudget();
+		// Guard: If manager, verify assigned to category
+		if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
+			User manager = userRepo.findById(userId.trim()).orElse(null);
+			if (manager != null) {
+				boolean isAssigned = manager.getAssignedCategories().stream()
+						.anyMatch(c -> c.getId().equalsIgnoreCase(project.getCategory().getId()));
+				if (!isAssigned) {
+					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to manage this sector/category.", false, Instant.now()));
+				}
+			}
+		}
 
-		List<ExpenseResponse> expenses = isSupervisor ? java.util.Collections.emptyList() : project.getExpenses().stream().map(e -> new ExpenseResponse(
-				e.getId(), e.getTitle(), e.getAmount(), e.getUnitPrice(), e.getQuantity(), e.getAdded_on(), e.getNotes())).toList();
+		boolean isSupervisor = "SUPERVISOR".equalsIgnoreCase(userRole);
+		boolean canViewFinancials = true;
+		if (isSupervisor) {
+			canViewFinancials = false;
+		} else if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
+			User manager = userRepo.findById(userId.trim()).orElse(null);
+			if (manager != null && (manager.getPrivileges() == null || !manager.getPrivileges().contains("CAN_VIEW_FINANCIALS"))) {
+				canViewFinancials = false;
+			}
+		}
+
+		BigDecimal totalExpenses = canViewFinancials ? expenseRepo.totalExpensesByProjectId(id) : BigDecimal.ZERO;
+		BigDecimal totalSales = canViewFinancials ? salesRepo.totalSalesByProjectId(id) : BigDecimal.ZERO;
+		BigDecimal netValue = canViewFinancials ? totalSales.subtract(totalExpenses) : BigDecimal.ZERO;
+		BigDecimal displayBudget = canViewFinancials ? project.getBudget() : BigDecimal.ZERO;
+
+		List<ExpenseResponse> expenses = canViewFinancials ? project.getExpenses().stream().map(e -> new ExpenseResponse(
+				e.getId(), e.getTitle(), e.getAmount(), e.getUnitPrice(), e.getQuantity(), e.getAdded_on(), e.getNotes())).toList() : java.util.Collections.emptyList();
 		
-		List<com.smartfarm.sales.Sale> projectSales = isSupervisor ? java.util.Collections.emptyList() : projectRepo.findProjectSales(id);
+		List<com.smartfarm.sales.Sale> projectSales = canViewFinancials ? projectRepo.findProjectSales(id) : java.util.Collections.emptyList();
 
 		ProjectResponse p = new ProjectResponse(project.getId(), project.getName(), project.getSeason(), displayBudget,
 				project.getStatus(), project.getStartDate(), project.getEndDate(), project.getDescription(), 
@@ -169,7 +191,12 @@ public class ProjectsService {
 		} else if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
 			allCount = projectRepo.countForManager(userId.trim());
 			activeCount = projectRepo.countActiveForManager(userId.trim(), "active");
-			totalBudget = projectRepo.totalBudgetForManager(userId.trim());
+			User manager = userRepo.findById(userId.trim()).orElse(null);
+			if (manager != null && manager.getPrivileges() != null && manager.getPrivileges().contains("CAN_VIEW_FINANCIALS")) {
+				totalBudget = projectRepo.totalBudgetForManager(userId.trim());
+			} else {
+				totalBudget = BigDecimal.ZERO;
+			}
 		} else {
 			allCount = projectRepo.count();
 			activeCount = projectRepo.totaActiveProjects("active");
@@ -180,9 +207,26 @@ public class ProjectsService {
 		return ResponseEntity.status(200).body(new ApiResponse<>(summary, "Projects summary", true, Instant.now()));
 	}
 
-	public ResponseEntity<ApiResponse<Project>> updateProjectStatus(String id, UpdateStatusRequest request) {
+	public ResponseEntity<ApiResponse<Project>> updateProjectStatus(String id, UpdateStatusRequest request, String userId, String userRole) {
 		Project project = projectRepo.findById(id)
 				.orElseThrow(() -> new EntityNotFoundException("Project not found: " + id));
+
+		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+			boolean isAssigned = project.getSupervisor() != null && userId != null && userId.trim().equals(project.getSupervisor().getId());
+			if (!isAssigned) {
+				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to supervise this project.", false, Instant.now()));
+			}
+		} else if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
+			User manager = userRepo.findById(userId.trim()).orElse(null);
+			if (manager == null) {
+				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Manager not found.", false, Instant.now()));
+			}
+			boolean isAssigned = manager.getAssignedCategories().stream()
+					.anyMatch(c -> c.getId().equalsIgnoreCase(project.getCategory().getId()));
+			if (!isAssigned) {
+				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to manage the category for this project.", false, Instant.now()));
+			}
+		}
 
 		String newStatus = request.status() != null ? request.status().trim().toLowerCase() : "active";
 		project.setStatus(newStatus);
@@ -191,9 +235,32 @@ public class ProjectsService {
 		return ResponseEntity.ok(new ApiResponse<>(saved, "Status updated to " + newStatus, true, Instant.now()));
 	}
 
-	public ResponseEntity<ApiResponse<Project>> updateProject(String id, UpdateProjectRequest request) {
+	public ResponseEntity<ApiResponse<Project>> updateProjectStatus(String id, UpdateStatusRequest request) {
+		return updateProjectStatus(id, request, null, null);
+	}
+
+	public ResponseEntity<ApiResponse<Project>> updateProject(String id, UpdateProjectRequest request, String userId, String userRole) {
 		Project project = projectRepo.findById(id)
 				.orElseThrow(() -> new EntityNotFoundException("Project not found: " + id));
+
+		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot edit project configurations.", false, Instant.now()));
+		}
+
+		if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
+			User manager = userRepo.findById(userId.trim()).orElse(null);
+			if (manager == null) {
+				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Manager not found.", false, Instant.now()));
+			}
+			boolean isAssigned = manager.getAssignedCategories().stream()
+					.anyMatch(c -> c.getId().equalsIgnoreCase(project.getCategory().getId()));
+			if (!isAssigned) {
+				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to manage the category for this project.", false, Instant.now()));
+			}
+			if (manager.getPrivileges() == null || !manager.getPrivileges().contains("CAN_MANAGE_BUDGETS")) {
+				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You do not have privilege to edit project details or budgets.", false, Instant.now()));
+			}
+		}
 
 		LocalDate effectiveStart = request.startDate() != null ? request.startDate() : project.getStartDate();
 		LocalDate effectiveEnd = request.endDate() != null ? request.endDate() : project.getEndDate();
@@ -218,9 +285,28 @@ public class ProjectsService {
 		return ResponseEntity.ok(new ApiResponse<>(saved, "Project updated", true, Instant.now()));
 	}
 
-	public ResponseEntity<ApiResponse<Project>> assignSupervisor(String id, AssignSupervisorRequest request) {
+	public ResponseEntity<ApiResponse<Project>> updateProject(String id, UpdateProjectRequest request) {
+		return updateProject(id, request, null, null);
+	}
+
+	public ResponseEntity<ApiResponse<Project>> assignSupervisor(String id, AssignSupervisorRequest request, String userId, String userRole) {
 		Project project = projectRepo.findById(id)
 				.orElseThrow(() -> new EntityNotFoundException("Project not found: " + id));
+
+		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot assign supervisors.", false, Instant.now()));
+		}
+
+		if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
+			User manager = userRepo.findById(userId.trim()).orElse(null);
+			if (manager != null) {
+				boolean isAssigned = manager.getAssignedCategories().stream()
+						.anyMatch(c -> c.getId().equalsIgnoreCase(project.getCategory().getId()));
+				if (!isAssigned) {
+					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to manage the category for this project.", false, Instant.now()));
+				}
+			}
+		}
 
 		if (request.supervisorId() != null && !request.supervisorId().trim().isEmpty()) {
 			User supervisor = userRepo.findById(request.supervisorId())
@@ -234,12 +320,40 @@ public class ProjectsService {
 		return ResponseEntity.ok(new ApiResponse<>(saved, "Supervisor assigned to project successfully.", true, Instant.now()));
 	}
 
+	public ResponseEntity<ApiResponse<Project>> assignSupervisor(String id, AssignSupervisorRequest request) {
+		return assignSupervisor(id, request, null, null);
+	}
+
 	@Transactional
-	public ResponseEntity<ApiResponse<Void>> deleteProject(String id) {
+	public ResponseEntity<ApiResponse<Void>> deleteProject(String id, String userId, String userRole) {
+		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot delete projects.", false, Instant.now()));
+		}
+
 		Project project = projectRepo.findById(id)
 				.orElseThrow(() -> new EntityNotFoundException("Project not found: " + id));
 
+		if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
+			User manager = userRepo.findById(userId.trim()).orElse(null);
+			if (manager == null) {
+				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Manager not found.", false, Instant.now()));
+			}
+			boolean isAssigned = manager.getAssignedCategories().stream()
+					.anyMatch(c -> c.getId().equalsIgnoreCase(project.getCategory().getId()));
+			if (!isAssigned) {
+				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to manage the category for this project.", false, Instant.now()));
+			}
+			if (manager.getPrivileges() == null || !manager.getPrivileges().contains("CAN_MANAGE_BUDGETS")) {
+				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You do not have privilege to delete projects.", false, Instant.now()));
+			}
+		}
+
 		projectRepo.delete(project);
 		return ResponseEntity.ok(new ApiResponse<>(null, "Project deleted successfully", true, Instant.now()));
+	}
+
+	@Transactional
+	public ResponseEntity<ApiResponse<Void>> deleteProject(String id) {
+		return deleteProject(id, null, null);
 	}
 }

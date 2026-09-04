@@ -20,19 +20,39 @@ public class ActivityController {
 	}
 	
 	@PostMapping("/record")
-	public ResponseEntity<ApiResponse<Activity>> recordActivity(@Valid @RequestBody CreateActivityRequest request){
-		return activityService.recordActivity(request);
+	public ResponseEntity<ApiResponse<Activity>> recordActivity(
+			@Valid @RequestBody CreateActivityRequest request,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@org.springframework.web.bind.annotation.RequestParam(required = false) String userId,
+			@org.springframework.web.bind.annotation.RequestParam(required = false) String userRole){
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return activityService.recordActivity(request, effectiveUserId, effectiveUserRole);
 	}
 
 	@org.springframework.web.bind.annotation.PutMapping("/{id}")
 	public ResponseEntity<ApiResponse<Activity>> updateActivity(
 			@org.springframework.web.bind.annotation.PathVariable String id,
-			@Valid @RequestBody UpdateActivityRequest request) {
-		return activityService.updateActivity(id, request);
+			@Valid @RequestBody UpdateActivityRequest request,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@org.springframework.web.bind.annotation.RequestParam(required = false) String userId,
+			@org.springframework.web.bind.annotation.RequestParam(required = false) String userRole) {
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return activityService.updateActivity(id, request, effectiveUserId, effectiveUserRole);
 	}
 
 	@org.springframework.web.bind.annotation.DeleteMapping("/{id}")
-	public ResponseEntity<ApiResponse<Void>> deleteActivity(@org.springframework.web.bind.annotation.PathVariable String id) {
-		return activityService.deleteActivity(id);
+	public ResponseEntity<ApiResponse<Void>> deleteActivity(
+			@org.springframework.web.bind.annotation.PathVariable String id,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@org.springframework.web.bind.annotation.RequestParam(required = false) String userId,
+			@org.springframework.web.bind.annotation.RequestParam(required = false) String userRole) {
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return activityService.deleteActivity(id, effectiveUserId, effectiveUserRole);
 	}
 }
