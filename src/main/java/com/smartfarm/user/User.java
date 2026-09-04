@@ -43,13 +43,8 @@ public class User {
 	)
 	private Set<Category> assignedCategories = new HashSet<>();
 
-	@jakarta.persistence.ElementCollection(fetch = FetchType.EAGER)
-	@jakarta.persistence.CollectionTable(
-		name = "user_privileges", 
-		joinColumns = @JoinColumn(name = "user_id")
-	)
-	@Column(name = "privilege_key")
-	private Set<String> privileges = new HashSet<>();
+	@Column(name = "privileges", length = 500)
+	private String privilegesRaw;
 	
 	public User() {}
 
@@ -65,17 +60,16 @@ public class User {
 	}
 
 	public void initDefaultPrivileges() {
-		if (this.privileges == null) {
-			this.privileges = new HashSet<>();
-		}
+		Set<String> privs = new HashSet<>();
 		if ("MANAGER".equalsIgnoreCase(this.role)) {
-			this.privileges.add("CAN_CREATE_SUPERVISORS");
-			this.privileges.add("CAN_VIEW_FINANCIALS");
+			privs.add("CAN_CREATE_SUPERVISORS");
+			privs.add("CAN_VIEW_FINANCIALS");
 		} else if ("SUPERVISOR".equalsIgnoreCase(this.role)) {
-			this.privileges.add("CAN_RECORD_HARVEST");
-			this.privileges.add("CAN_LOG_ACTIVITIES");
-			this.privileges.add("CAN_USE_INVENTORY");
+			privs.add("CAN_RECORD_HARVEST");
+			privs.add("CAN_LOG_ACTIVITIES");
+			privs.add("CAN_USE_INVENTORY");
 		}
+		setPrivileges(privs);
 	}
 
 	public String getId() {
@@ -139,12 +133,31 @@ public class User {
 		this.maxProjectCapacity = maxProjectCapacity <= 0 ? 4 : maxProjectCapacity;
 	}
 	public Set<String> getPrivileges() {
-		if (this.privileges == null) {
-			this.privileges = new HashSet<>();
+		Set<String> result = new HashSet<>();
+		if (this.privilegesRaw != null && !this.privilegesRaw.trim().isEmpty()) {
+			for (String p : this.privilegesRaw.split(",")) {
+				String trimmed = p.trim();
+				if (!trimmed.isEmpty()) {
+					result.add(trimmed);
+				}
+			}
+		} else {
+			if ("MANAGER".equalsIgnoreCase(this.role)) {
+				result.add("CAN_CREATE_SUPERVISORS");
+				result.add("CAN_VIEW_FINANCIALS");
+			} else if ("SUPERVISOR".equalsIgnoreCase(this.role)) {
+				result.add("CAN_RECORD_HARVEST");
+				result.add("CAN_LOG_ACTIVITIES");
+				result.add("CAN_USE_INVENTORY");
+			}
 		}
-		return privileges;
+		return result;
 	}
 	public void setPrivileges(Set<String> privileges) {
-		this.privileges = privileges;
+		if (privileges == null || privileges.isEmpty()) {
+			this.privilegesRaw = "";
+		} else {
+			this.privilegesRaw = String.join(",", privileges);
+		}
 	}
 }

@@ -22,8 +22,16 @@ public class GlobalExceptionHandler {
 	}
 	
 	@ExceptionHandler(SQLException.class)
-	public ResponseEntity<String> handleJsonError(SQLException ex){ 
-		return ResponseEntity.status(400).body("Database error !"); 
+	public ResponseEntity<ApiResponse<String>> handleSqlError(SQLException ex){ 
+		ex.printStackTrace();
+		return ResponseEntity.status(400).body(new ApiResponse<>(null, "Database error: " + (ex.getMessage() != null ? ex.getMessage() : "SQL Exception"), false, Instant.now())); 
+	}
+
+	@ExceptionHandler(org.springframework.dao.DataAccessException.class)
+	public ResponseEntity<ApiResponse<String>> handleDataAccessException(org.springframework.dao.DataAccessException ex){ 
+		ex.printStackTrace();
+		String msg = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
+		return ResponseEntity.status(400).body(new ApiResponse<>(null, "Database error: " + (msg != null ? msg : "Data access error"), false, Instant.now())); 
 	}
 	
 	@ExceptionHandler(MethodArgumentNotValidException.class) 
