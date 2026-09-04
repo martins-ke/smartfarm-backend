@@ -343,29 +343,34 @@ public class UserService {
 
 	@Transactional
 	public ResponseEntity<ApiResponse<Void>> assignProjectsToSupervisor(String supervisorId, AssignProjectsRequest request) {
-		User supervisor = userRepo.findById(supervisorId)
+		String trimmedId = supervisorId != null ? supervisorId.trim() : "";
+		User supervisor = userRepo.findById(trimmedId)
 			.orElseThrow(() -> new EntityNotFoundException("Supervisor not found: " + supervisorId));
 
-		if (request.projectIds() != null && request.projectIds().size() > supervisor.getMaxProjectCapacity()) {
+		int capacity = supervisor.getMaxProjectCapacity() <= 0 ? 4 : supervisor.getMaxProjectCapacity();
+
+		if (request != null && request.projectIds() != null && request.projectIds().size() > capacity) {
 			return ResponseEntity.status(400).body(new ApiResponse<>(null, 
-				"Assignment exceeds maximum active capacity (" + supervisor.getMaxProjectCapacity() + " projects) for supervisor " + supervisor.getUsername(), 
+				"Assignment exceeds maximum active capacity (" + capacity + " projects) for supervisor " + supervisor.getUsername(), 
 				false, Instant.now()));
 		}
 
 		// Unassign all existing projects for this supervisor
-		List<Project> currentlyAssigned = projectRepo.findBySupervisorId(supervisorId);
+		List<Project> currentlyAssigned = projectRepo.findBySupervisorId(trimmedId);
 		for (Project p : currentlyAssigned) {
 			p.setSupervisor(null);
 			projectRepo.save(p);
 		}
 
 		// Assign selected projects
-		if (request.projectIds() != null) {
+		if (request != null && request.projectIds() != null) {
 			for (String projId : request.projectIds()) {
-				projectRepo.findById(projId).ifPresent(p -> {
-					p.setSupervisor(supervisor);
-					projectRepo.save(p);
-				});
+				if (projId != null && !projId.trim().isEmpty()) {
+					projectRepo.findById(projId.trim()).ifPresent(p -> {
+						p.setSupervisor(supervisor);
+						projectRepo.save(p);
+					});
+				}
 			}
 		}
 

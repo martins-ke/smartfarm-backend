@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -49,8 +50,15 @@ public class InventoryController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> deleteItem(@PathVariable("id") String id) {
-        return inventoryService.deleteItem(id);
+    public ResponseEntity<ApiResponse<Void>> deleteItem(
+            @PathVariable("id") String id,
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+            @RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+            @RequestParam(required = false) String userId,
+            @RequestParam(required = false) String userRole) {
+        String effectiveUserId = userId != null ? userId : headerUserId;
+        String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+        return inventoryService.deleteItem(id, effectiveUserId, effectiveUserRole);
     }
 
     @PostMapping("/{id}/use")

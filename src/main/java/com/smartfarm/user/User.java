@@ -133,10 +133,10 @@ public class User {
 		this.managerId = managerId;
 	}
 	public int getMaxProjectCapacity() {
-		return maxProjectCapacity;
+		return maxProjectCapacity <= 0 ? 4 : maxProjectCapacity;
 	}
 	public void setMaxProjectCapacity(int maxProjectCapacity) {
-		this.maxProjectCapacity = maxProjectCapacity;
+		this.maxProjectCapacity = maxProjectCapacity <= 0 ? 4 : maxProjectCapacity;
 	}
 	public Set<String> getPrivileges() {
 		if (this.privileges == null) {

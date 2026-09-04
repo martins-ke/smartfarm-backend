@@ -20,6 +20,9 @@ import com.smartfarm.projects.Project;
 import com.smartfarm.projects.ProjectRepository;
 import com.smartfarm.util.IdGenarator;
 
+import com.smartfarm.user.User;
+import com.smartfarm.user.UserRepository;
+
 import jakarta.persistence.EntityNotFoundException;
 
 @Service
@@ -28,11 +31,13 @@ public class InventoryService {
     private final InventoryItemRepository inventoryRepo;
     private final ExpenseRepository expenseRepo;
     private final ProjectRepository projectRepo;
+    private final UserRepository userRepo;
 
-    public InventoryService(InventoryItemRepository inventoryRepo, ExpenseRepository expenseRepo, ProjectRepository projectRepo) {
+    public InventoryService(InventoryItemRepository inventoryRepo, ExpenseRepository expenseRepo, ProjectRepository projectRepo, UserRepository userRepo) {
         this.inventoryRepo = inventoryRepo;
         this.expenseRepo = expenseRepo;
         this.projectRepo = projectRepo;
+        this.userRepo = userRepo;
     }
 
     public ResponseEntity<ApiResponse<Page<InventoryItem>>> getAllItems(int page, int size) {
@@ -73,6 +78,31 @@ public class InventoryService {
     }
 
     public ResponseEntity<ApiResponse<Void>> deleteItem(String id) {
+        return deleteItem(id, null, "ADMIN");
+    }
+
+    public ResponseEntity<ApiResponse<Void>> deleteItem(String id, String userId, String userRole) {
+        boolean authorized = false;
+
+        if (userRole != null && "ADMIN".equalsIgnoreCase(userRole.trim())) {
+            authorized = true;
+        } else if (userId != null && !userId.trim().isEmpty()) {
+            User user = userRepo.findById(userId.trim()).orElse(null);
+            if (user != null) {
+                if ("ADMIN".equalsIgnoreCase(user.getRole())) {
+                    authorized = true;
+                } else if ("MANAGER".equalsIgnoreCase(user.getRole()) 
+                        && user.getPrivileges() != null 
+                        && user.getPrivileges().contains("CAN_DELETE_INVENTORY")) {
+                    authorized = true;
+                }
+            }
+        }
+
+        if (!authorized) {
+            return ResponseEntity.status(403).body(new ApiResponse<>(null, "You do not have permission to delete inventory items.", false, Instant.now()));
+        }
+
         InventoryItem item = inventoryRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Inventory item not found"));
         inventoryRepo.delete(item);
