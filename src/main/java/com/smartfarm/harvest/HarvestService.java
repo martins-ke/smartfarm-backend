@@ -27,8 +27,11 @@ public class HarvestService {
 	public ResponseEntity<ApiResponse<Harvest>> recordHarvest(CreateHarvestRequest request){
 		Project project = projectRepo.findById(request.project_id()).orElseThrow(()-> new EntityNotFoundException("Project not in the system!"));
 		long count = harvestRepo.count(); 
-		
 		String id = IdGenarator.generateId(request.item(), count);
+		while (harvestRepo.existsById(id)) {
+			count++;
+			id = IdGenarator.generateId(request.item(), count);
+		}
 		Harvest harvest = new Harvest(id, request.item(), request.quantity(), request.units(), request.notes(), LocalDate.now(), project);
 		
 		return ResponseEntity.status(201).body(new ApiResponse<>(harvestRepo.save(harvest), "Harvest recorded successfully ✅", true, Instant.now())); 

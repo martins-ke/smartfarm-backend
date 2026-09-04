@@ -18,6 +18,8 @@ public interface ProjectRepository extends JpaRepository<Project, String> {
 
 	List<Project> findByCategoryId(String category_id);
 	Page<Project> findByCategoryId(String category_id, Pageable pageable);
+	boolean existsByName(String name);
+	boolean existsByNameIgnoreCase(String name);
 
 	List<Project> findBySupervisorId(String supervisorId);
 

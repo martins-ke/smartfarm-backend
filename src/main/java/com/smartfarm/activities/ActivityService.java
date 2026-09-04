@@ -27,8 +27,11 @@ public class ActivityService {
 	public ResponseEntity<ApiResponse<Activity>> recordActivity(CreateActivityRequest request){
 		Project project = projectRepo.findById(request.project_id()).orElseThrow(()-> new EntityNotFoundException("Project not in the system!"));
 		long count = activityRepo.count(); 
-		
-		String id = IdGenarator.generateId(request.title(), count); 
+		String id = IdGenarator.generateId(request.title(), count);
+		while (activityRepo.existsById(id)) {
+			count++;
+			id = IdGenarator.generateId(request.title(), count);
+		} 
 		Activity activity = new Activity(id, request.title(), request.type(),LocalDate.now(), request.notes(), project);
 		
 		return ResponseEntity.status(201).body(new ApiResponse<>(activityRepo.save(activity), "Activity recorded successfully ✅", true, Instant.now())); 

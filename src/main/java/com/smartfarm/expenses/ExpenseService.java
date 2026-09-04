@@ -29,8 +29,11 @@ public class ExpenseService {
 	public ResponseEntity<ApiResponse<Expense>> createExpense(CreateExpenseRequest request){
 		Project project = projectRepo.findById(request.project_id()).orElseThrow(()-> new EntityNotFoundException("Project not in the system!"));
 		long count = expenseRepo.count(); 
-		
-		String id = IdGenarator.generateId(request.title(), count); 
+		String id = IdGenarator.generateId(request.title(), count);
+		while (expenseRepo.existsById(id)) {
+			count++;
+			id = IdGenarator.generateId(request.title(), count);
+		} 
 		Expense expense = new Expense(id, request.title(), request.amount(), request.unitPrice(), request.quantity(), LocalDate.now(), request.notes(), project);
 		
 		return ResponseEntity.status(201).body(new ApiResponse<>(expenseRepo.save(expense), "Expense recorded successfully ✅", true, Instant.now())); 

@@ -47,13 +47,22 @@ public class ProjectsService {
 			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Start date cannot be greater than end date!", false, Instant.now()));
 		}
 
+		if (request.name() != null && projectRepo.existsByNameIgnoreCase(request.name().trim())) {
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "A project with the name '" + request.name().trim() + "' already exists! Please choose a unique name.", false, Instant.now()));
+		}
+
 		Category category = categoryRepo.findById(request.category_id()).orElseThrow(()-> new EntityNotFoundException("Category not in the system!"));
 		long count = projectRepo.count();
 		
-		String id = IdGenarator.generateId(request.name(), count); 
-		Project p = new Project(id, request.name(), request.season(), request.status(), request.startDate(), 
+		String id = IdGenarator.generateId(request.name().trim(), count);
+		while (projectRepo.existsById(id)) {
+			count++;
+			id = IdGenarator.generateId(request.name().trim(), count);
+		}
+
+		Project p = new Project(id, request.name().trim(), request.season(), request.status(), request.startDate(), 
 						request.endDate(), request.budget(), request.description(), category);
-		return ResponseEntity.status(201).body(new ApiResponse<>(projectRepo.save(p), null, true, Instant.now())); 
+		return ResponseEntity.status(201).body(new ApiResponse<>(projectRepo.save(p), "Project created successfully", true, Instant.now())); 
 	}
 	
 	public ResponseEntity<ApiResponse<Page<Project>>> getProjectsByCategoryId(String category_id, int page, int size, String userId, String userRole){
@@ -167,7 +176,12 @@ public class ProjectsService {
 			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Start date cannot be greater than end date!", false, Instant.now()));
 		}
 
-		if (request.name() != null)        project.setName(request.name());
+		if (request.name() != null && !request.name().trim().equalsIgnoreCase(project.getName())) {
+			if (projectRepo.existsByNameIgnoreCase(request.name().trim())) {
+				return ResponseEntity.status(400).body(new ApiResponse<>(null, "A project with the name '" + request.name().trim() + "' already exists! Please choose a unique name.", false, Instant.now()));
+			}
+			project.setName(request.name().trim());
+		}
 		if (request.season() != null)      project.setSeason(request.season());
 		if (request.status() != null)      project.setStatus(request.status());
 		if (request.startDate() != null)   project.setStartDate(request.startDate());

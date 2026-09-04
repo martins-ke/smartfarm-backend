@@ -44,6 +44,10 @@ public class InventoryService {
     public ResponseEntity<ApiResponse<InventoryItem>> createItem(CreateInventoryItemRequest request) {
         long count = inventoryRepo.count();
         String id = IdGenarator.generateId(request.name(), count);
+        while (inventoryRepo.existsById(id)) {
+            count++;
+            id = IdGenarator.generateId(request.name(), count);
+        }
         
         InventoryItem item = new InventoryItem(
             id, request.name(), request.category(), request.unit(), 

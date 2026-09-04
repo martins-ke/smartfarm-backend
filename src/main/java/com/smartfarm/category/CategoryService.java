@@ -20,6 +20,10 @@ public class CategoryService {
 	public ResponseEntity<ApiResponse<Category>> createCategory(CategoryRequest request){ 
 		long count = categoryRepo.count();
 		String id = IdGenarator.generateId(request.name(), count);
+		while (categoryRepo.existsById(id)) {
+			count++;
+			id = IdGenarator.generateId(request.name(), count);
+		}
 		
 		Category c = new Category(id, request.name(), request.description()); 
 		
