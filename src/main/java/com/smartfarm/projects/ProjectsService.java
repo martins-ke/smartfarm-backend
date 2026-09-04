@@ -93,18 +93,22 @@ public class ProjectsService {
 			}
 		}
 
-		List<ExpenseResponse> expenses = project.getExpenses().stream().map(e -> new ExpenseResponse(
-				e.getId(), e.getTitle(), e.getAmount(), e.getUnitPrice(), e.getQuantity(), e.getAdded_on(), e.getNotes())).toList();
+		boolean isSupervisor = "SUPERVISOR".equalsIgnoreCase(userRole);
+		BigDecimal totalExpenses = isSupervisor ? BigDecimal.ZERO : expenseRepo.totalExpensesByProjectId(id);
+		BigDecimal totalSales = isSupervisor ? BigDecimal.ZERO : salesRepo.totalSalesByProjectId(id);
+		BigDecimal netValue = isSupervisor ? BigDecimal.ZERO : totalSales.subtract(totalExpenses);
+		BigDecimal displayBudget = isSupervisor ? BigDecimal.ZERO : project.getBudget();
 
-		BigDecimal totalExpenses = expenseRepo.totalExpensesByProjectId(id);
-		BigDecimal totalSales = salesRepo.totalSalesByProjectId(id);
-		BigDecimal netValue = totalSales.subtract(totalExpenses);
+		List<ExpenseResponse> expenses = isSupervisor ? java.util.Collections.emptyList() : project.getExpenses().stream().map(e -> new ExpenseResponse(
+				e.getId(), e.getTitle(), e.getAmount(), e.getUnitPrice(), e.getQuantity(), e.getAdded_on(), e.getNotes())).toList();
 		
-		ProjectResponse p = new ProjectResponse(project.getId(), project.getName(), project.getSeason(), project.getBudget(),
+		List<com.smartfarm.sales.Sale> projectSales = isSupervisor ? java.util.Collections.emptyList() : projectRepo.findProjectSales(id);
+
+		ProjectResponse p = new ProjectResponse(project.getId(), project.getName(), project.getSeason(), displayBudget,
 				project.getStatus(), project.getStartDate(), project.getEndDate(), project.getDescription(), 
 				totalSales, totalExpenses, netValue,
 				expenses, 
-				projectRepo.findProjectSales(id), 
+				projectSales, 
 				projectRepo.findProjectHarvest(id),
 				projectRepo.findProjectActivities(id));
 		
@@ -140,7 +144,7 @@ public class ProjectsService {
 		if ("SUPERVISOR".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
 			allCount = projectRepo.countBySupervisorId(userId.trim());
 			activeCount = projectRepo.countActiveBySupervisorId(userId.trim(), "active");
-			totalBudget = projectRepo.totalBudgetBySupervisorId(userId.trim());
+			totalBudget = BigDecimal.ZERO; // Financial Shield for Supervisor
 		} else if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
 			allCount = projectRepo.countForManager(userId.trim());
 			activeCount = projectRepo.countActiveForManager(userId.trim(), "active");

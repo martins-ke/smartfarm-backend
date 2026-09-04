@@ -32,6 +32,8 @@ public class User {
 	@Column(nullable = false)
 	private String status; // "ACTIVE", "PENDING_APPROVAL", "DISABLED"
 	private String createdById; // Tracks which Admin/Manager created this user
+	private String managerId; // Tracks parent Manager for dedicated 1:N supervisors
+	private int maxProjectCapacity = 4; // Default max project capacity for supervisors
 
 	@ManyToMany(fetch = FetchType.EAGER)
 	@JoinTable(
@@ -40,6 +42,14 @@ public class User {
 		inverseJoinColumns = @JoinColumn(name = "category_id")
 	)
 	private Set<Category> assignedCategories = new HashSet<>();
+
+	@jakarta.persistence.ElementCollection(fetch = FetchType.EAGER)
+	@jakarta.persistence.CollectionTable(
+		name = "user_privileges", 
+		joinColumns = @JoinColumn(name = "user_id")
+	)
+	@Column(name = "privilege_key")
+	private Set<String> privileges = new HashSet<>();
 	
 	public User() {}
 
@@ -51,6 +61,21 @@ public class User {
 		this.role = role != null ? role.toUpperCase() : "MANAGER";
 		this.status = status != null ? status.toUpperCase() : "ACTIVE";
 		this.createdById = createdById;
+		initDefaultPrivileges();
+	}
+
+	public void initDefaultPrivileges() {
+		if (this.privileges == null) {
+			this.privileges = new HashSet<>();
+		}
+		if ("MANAGER".equalsIgnoreCase(this.role)) {
+			this.privileges.add("CAN_CREATE_SUPERVISORS");
+			this.privileges.add("CAN_VIEW_FINANCIALS");
+		} else if ("SUPERVISOR".equalsIgnoreCase(this.role)) {
+			this.privileges.add("CAN_RECORD_HARVEST");
+			this.privileges.add("CAN_LOG_ACTIVITIES");
+			this.privileges.add("CAN_USE_INVENTORY");
+		}
 	}
 
 	public String getId() {
@@ -100,5 +125,26 @@ public class User {
 	}
 	public void setAssignedCategories(Set<Category> assignedCategories) {
 		this.assignedCategories = assignedCategories;
+	}
+	public String getManagerId() {
+		return managerId;
+	}
+	public void setManagerId(String managerId) {
+		this.managerId = managerId;
+	}
+	public int getMaxProjectCapacity() {
+		return maxProjectCapacity;
+	}
+	public void setMaxProjectCapacity(int maxProjectCapacity) {
+		this.maxProjectCapacity = maxProjectCapacity;
+	}
+	public Set<String> getPrivileges() {
+		if (this.privileges == null) {
+			this.privileges = new HashSet<>();
+		}
+		return privileges;
+	}
+	public void setPrivileges(Set<String> privileges) {
+		this.privileges = privileges;
 	}
 }

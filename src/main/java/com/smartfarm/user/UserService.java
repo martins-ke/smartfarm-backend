@@ -236,9 +236,11 @@ public class UserService {
 		return ResponseEntity.ok(new ApiResponse<>(user, "Password has been successfully updated by Admin.", true, Instant.now()));
 	}
 
-	public ResponseEntity<ApiResponse<List<User>>> getAllUsers(String role, String createdById) {
+	public ResponseEntity<ApiResponse<List<User>>> getAllUsers(String role, String createdById, String managerId) {
 		List<User> users;
-		if (createdById != null && !createdById.trim().isEmpty()) {
+		if (managerId != null && !managerId.trim().isEmpty()) {
+			users = userRepo.findByManagerId(managerId.trim());
+		} else if (createdById != null && !createdById.trim().isEmpty()) {
 			users = userRepo.findByCreatedById(createdById.trim());
 		} else if (role != null && !role.trim().isEmpty()) {
 			users = userRepo.findByRoleIgnoreCase(role.trim());
@@ -292,6 +294,13 @@ public class UserService {
 
 		String hashedPassword = passwordEncoder.encode(password);
 		User user = new User(id, username, email, hashedPassword, role, "ACTIVE", request.createdById());
+		if ("SUPERVISOR".equalsIgnoreCase(role) && request.createdById() != null) {
+			userRepo.findById(request.createdById()).ifPresent(creator -> {
+				if ("MANAGER".equalsIgnoreCase(creator.getRole())) {
+					user.setManagerId(creator.getId());
+				}
+			});
+		}
 		User saved = userRepo.save(user);
 
 		return ResponseEntity.status(201).body(new ApiResponse<>(saved, role + " created and activated successfully.", true, Instant.now()));
@@ -324,13 +333,24 @@ public class UserService {
 		user.setAssignedCategories(categories);
 		User saved = userRepo.save(user);
 
-		return ResponseEntity.ok(new ApiResponse<>(saved, "Categories assigned to " + user.getUsername(), true, Instant.now()));
+		String msg = "Categories assigned to " + user.getUsername();
+		if (categories.size() > 3) {
+			msg += " (Warning: Workload capacity threshold reached — Manager is supervising " + categories.size() + " categories)";
+		}
+
+		return ResponseEntity.ok(new ApiResponse<>(saved, msg, true, Instant.now()));
 	}
 
 	@Transactional
 	public ResponseEntity<ApiResponse<Void>> assignProjectsToSupervisor(String supervisorId, AssignProjectsRequest request) {
 		User supervisor = userRepo.findById(supervisorId)
 			.orElseThrow(() -> new EntityNotFoundException("Supervisor not found: " + supervisorId));
+
+		if (request.projectIds() != null && request.projectIds().size() > supervisor.getMaxProjectCapacity()) {
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, 
+				"Assignment exceeds maximum active capacity (" + supervisor.getMaxProjectCapacity() + " projects) for supervisor " + supervisor.getUsername(), 
+				false, Instant.now()));
+		}
 
 		// Unassign all existing projects for this supervisor
 		List<Project> currentlyAssigned = projectRepo.findBySupervisorId(supervisorId);
@@ -350,6 +370,22 @@ public class UserService {
 		}
 
 		return ResponseEntity.ok(new ApiResponse<>(null, "Projects assigned to " + supervisor.getUsername() + " successfully.", true, Instant.now()));
+	}
+
+	@Transactional
+	public ResponseEntity<ApiResponse<User>> updatePrivileges(String id, UpdatePrivilegesRequest request) {
+		User user = userRepo.findById(id)
+			.orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
+
+		if (request.privileges() != null) {
+			user.setPrivileges(request.privileges());
+		}
+		if (request.maxProjectCapacity() != null && request.maxProjectCapacity() > 0) {
+			user.setMaxProjectCapacity(request.maxProjectCapacity());
+		}
+
+		User saved = userRepo.save(user);
+		return ResponseEntity.ok(new ApiResponse<>(saved, "Privileges updated successfully for " + user.getUsername(), true, Instant.now()));
 	}
 
 	public ResponseEntity<ApiResponse<List<Project>>> getSupervisorProjects(String supervisorId) {

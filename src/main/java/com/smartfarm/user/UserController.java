@@ -65,8 +65,9 @@ public class UserController {
 	@GetMapping
 	public ResponseEntity<ApiResponse<List<User>>> getAllUsers(
 			@RequestParam(required = false) String role,
-			@RequestParam(required = false) String createdById) {
-		return service.getAllUsers(role, createdById);
+			@RequestParam(required = false) String createdById,
+			@RequestParam(required = false) String managerId) {
+		return service.getAllUsers(role, createdById, managerId);
 	}
 
 	@GetMapping("/{id}")
@@ -84,6 +85,13 @@ public class UserController {
 			@PathVariable String id,
 			@Valid @RequestBody UpdateUserStatusRequest request) {
 		return service.updateUserStatus(id, request);
+	}
+
+	@PatchMapping("/{id}/privileges")
+	public ResponseEntity<ApiResponse<User>> updatePrivileges(
+			@PathVariable String id,
+			@RequestBody UpdatePrivilegesRequest request) {
+		return service.updatePrivileges(id, request);
 	}
 
 	@PutMapping("/{id}/categories")
