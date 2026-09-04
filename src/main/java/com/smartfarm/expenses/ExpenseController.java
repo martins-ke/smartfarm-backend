@@ -35,9 +35,18 @@ public class ExpenseController {
 	
 	@GetMapping("/{project_id}")
 	public ResponseEntity<ApiResponse<List<Expense>>> getExpensesByProjectId(@PathVariable String project_id) {
-		
 		return expenseService.getExpensesByProjectId(project_id); 
-		 
 	}
 
+	@org.springframework.web.bind.annotation.PutMapping("/{id}")
+	public ResponseEntity<ApiResponse<Expense>> updateExpense(
+			@PathVariable String id,
+			@Valid @RequestBody UpdateExpenseRequest request) {
+		return expenseService.updateExpense(id, request);
+	}
+
+	@org.springframework.web.bind.annotation.DeleteMapping("/{id}")
+	public ResponseEntity<ApiResponse<Void>> deleteExpense(@PathVariable String id) {
+		return expenseService.deleteExpense(id);
+	}
 }

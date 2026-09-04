@@ -21,8 +21,18 @@ final class HarvestController {
 	
 	@PostMapping("/record")
 	final ResponseEntity<ApiResponse<Harvest>> recordHarvest(@Valid @RequestBody CreateHarvestRequest request){
-		
 		return harvestService.recordHarvest(request); 
 	}
 
+	@org.springframework.web.bind.annotation.PutMapping("/{id}")
+	final ResponseEntity<ApiResponse<Harvest>> updateHarvest(
+			@org.springframework.web.bind.annotation.PathVariable String id,
+			@Valid @RequestBody UpdateHarvestRequest request) {
+		return harvestService.updateHarvest(id, request);
+	}
+
+	@org.springframework.web.bind.annotation.DeleteMapping("/{id}")
+	final ResponseEntity<ApiResponse<Void>> deleteHarvest(@org.springframework.web.bind.annotation.PathVariable String id) {
+		return harvestService.deleteHarvest(id);
+	}
 }

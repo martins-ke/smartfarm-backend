@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.smartfarm.ApiResponse;
 import com.smartfarm.category.Category;
@@ -211,5 +212,14 @@ public class ProjectsService {
 
 		Project saved = projectRepo.save(project);
 		return ResponseEntity.ok(new ApiResponse<>(saved, "Supervisor assigned to project successfully.", true, Instant.now()));
+	}
+
+	@Transactional
+	public ResponseEntity<ApiResponse<Void>> deleteProject(String id) {
+		Project project = projectRepo.findById(id)
+				.orElseThrow(() -> new EntityNotFoundException("Project not found: " + id));
+
+		projectRepo.delete(project);
+		return ResponseEntity.ok(new ApiResponse<>(null, "Project deleted successfully", true, Instant.now()));
 	}
 }

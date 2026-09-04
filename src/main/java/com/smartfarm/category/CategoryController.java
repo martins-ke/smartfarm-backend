@@ -5,7 +5,10 @@ import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,5 +45,17 @@ public class CategoryController {
 		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
 
 		return categoryService.getAllCategories(effectiveUserId, effectiveUserRole); 
+	}
+
+	@org.springframework.web.bind.annotation.PutMapping("/{id}")
+	public ResponseEntity<ApiResponse<Category>> updateCategory(
+			@PathVariable String id,
+			@Valid @RequestBody CategoryRequest request) {
+		return categoryService.updateCategory(id, request);
+	}
+
+	@org.springframework.web.bind.annotation.DeleteMapping("/{id}")
+	public ResponseEntity<ApiResponse<Void>> deleteCategory(@PathVariable String id) {
+		return categoryService.deleteCategory(id);
 	}
 }

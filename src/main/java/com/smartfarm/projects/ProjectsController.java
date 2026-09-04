@@ -128,4 +128,9 @@ public class ProjectsController {
 			@RequestBody AssignSupervisorRequest request) {
 		return projectService.assignSupervisor(id, request);
 	}
+
+	@org.springframework.web.bind.annotation.DeleteMapping("/{id}")
+	public ResponseEntity<ApiResponse<Void>> deleteProject(@PathVariable String id) {
+		return projectService.deleteProject(id);
+	}
 }

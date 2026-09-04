@@ -54,4 +54,11 @@ public class SalesController {
 	public ResponseEntity<ApiResponse<Void>> deleteSale(@PathVariable String id) {
 		return salesService.deleteSale(id);
 	}
+
+	@org.springframework.web.bind.annotation.PutMapping("/{id}")
+	public ResponseEntity<ApiResponse<Sale>> updateSale(
+			@PathVariable String id,
+			@Valid @RequestBody UpdateSaleRequest request) {
+		return salesService.updateSale(id, request);
+	}
 }

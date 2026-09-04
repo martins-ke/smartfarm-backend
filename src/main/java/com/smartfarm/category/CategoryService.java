@@ -42,4 +42,32 @@ public class CategoryService {
 		}
 		return ResponseEntity.status(200).body(new ApiResponse<>(categoryRepo.findAll(), null, true, Instant.now())); 
 	}
+
+	public ResponseEntity<ApiResponse<Category>> updateCategory(String id, CategoryRequest request) {
+		Category category = categoryRepo.findById(id)
+				.orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Category not found with ID: " + id));
+
+		String newName = request.name() != null ? request.name().trim() : "";
+		if (!newName.isEmpty() && !newName.equalsIgnoreCase(category.getName())) {
+			if (categoryRepo.existsByNameIgnoreCase(newName)) {
+				return ResponseEntity.status(400).body(new ApiResponse<>(null, "A category with the name '" + newName + "' already exists!", false, Instant.now()));
+			}
+			category.setName(newName);
+		}
+
+		if (request.description() != null) {
+			category.setDescription(request.description().trim());
+		}
+
+		Category saved = categoryRepo.save(category);
+		return ResponseEntity.ok(new ApiResponse<>(saved, "Category updated successfully ✅", true, Instant.now()));
+	}
+
+	public ResponseEntity<ApiResponse<Void>> deleteCategory(String id) {
+		Category category = categoryRepo.findById(id)
+				.orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Category not found with ID: " + id));
+
+		categoryRepo.delete(category);
+		return ResponseEntity.ok(new ApiResponse<>(null, "Category deleted successfully", true, Instant.now()));
+	}
 }

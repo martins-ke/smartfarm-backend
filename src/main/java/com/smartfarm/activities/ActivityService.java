@@ -36,4 +36,30 @@ public class ActivityService {
 		
 		return ResponseEntity.status(201).body(new ApiResponse<>(activityRepo.save(activity), "Activity recorded successfully ✅", true, Instant.now())); 
 	} 
+
+	public ResponseEntity<ApiResponse<Activity>> updateActivity(String id, UpdateActivityRequest request) {
+		Activity activity = activityRepo.findById(id)
+				.orElseThrow(() -> new EntityNotFoundException("Activity not found with ID: " + id));
+
+		if (request.title() != null && !request.title().trim().isEmpty()) {
+			activity.setTitle(request.title().trim());
+		}
+		if (request.type() != null && !request.type().trim().isEmpty()) {
+			activity.setType(request.type().trim());
+		}
+		if (request.notes() != null) {
+			activity.setNotes(request.notes().trim());
+		}
+
+		Activity saved = activityRepo.save(activity);
+		return ResponseEntity.ok(new ApiResponse<>(saved, "Activity updated successfully ✅", true, Instant.now()));
+	}
+
+	public ResponseEntity<ApiResponse<Void>> deleteActivity(String id) {
+		Activity activity = activityRepo.findById(id)
+				.orElseThrow(() -> new EntityNotFoundException("Activity not found with ID: " + id));
+
+		activityRepo.delete(activity);
+		return ResponseEntity.ok(new ApiResponse<>(null, "Activity deleted successfully", true, Instant.now()));
+	}
 }

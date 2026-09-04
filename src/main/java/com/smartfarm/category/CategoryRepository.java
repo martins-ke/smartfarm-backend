@@ -13,4 +13,6 @@ public interface CategoryRepository extends JpaRepository<Category, String> {
 
 	@Query("SELECT DISTINCT c FROM Category c WHERE c.id IN (SELECT ac.id FROM User u JOIN u.assignedCategories ac WHERE u.id = :managerId) OR c.id IN (SELECT p.category.id FROM Project p WHERE p.manager.id = :managerId)")
 	List<Category> findCategoriesForManager(@Param("managerId") String managerId);
+
+	boolean existsByNameIgnoreCase(String name);
 }

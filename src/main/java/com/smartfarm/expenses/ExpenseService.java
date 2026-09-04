@@ -42,4 +42,36 @@ public class ExpenseService {
 	public ResponseEntity<ApiResponse<List<Expense>>> getExpensesByProjectId(String projectId) {
 		return ResponseEntity.status(200).body(new ApiResponse<>(expenseRepo.findByProjectId(projectId), "Expense list fetched successfully", true, Instant.now()));
 	}
+
+	public ResponseEntity<ApiResponse<Expense>> updateExpense(String id, UpdateExpenseRequest request) {
+		Expense expense = expenseRepo.findById(id)
+				.orElseThrow(() -> new EntityNotFoundException("Expense not found with ID: " + id));
+
+		if (request.title() != null && !request.title().trim().isEmpty()) {
+			expense.setTitle(request.title().trim());
+		}
+		if (request.amount() != null) {
+			expense.setAmount(request.amount());
+		}
+		if (request.unitPrice() != null) {
+			expense.setUnitPrice(request.unitPrice());
+		}
+		if (request.quantity() != null) {
+			expense.setQuantity(request.quantity());
+		}
+		if (request.notes() != null) {
+			expense.setNotes(request.notes().trim());
+		}
+
+		Expense saved = expenseRepo.save(expense);
+		return ResponseEntity.ok(new ApiResponse<>(saved, "Expense updated successfully ✅", true, Instant.now()));
+	}
+
+	public ResponseEntity<ApiResponse<Void>> deleteExpense(String id) {
+		Expense expense = expenseRepo.findById(id)
+				.orElseThrow(() -> new EntityNotFoundException("Expense not found with ID: " + id));
+
+		expenseRepo.delete(expense);
+		return ResponseEntity.ok(new ApiResponse<>(null, "Expense deleted successfully", true, Instant.now()));
+	}
 }

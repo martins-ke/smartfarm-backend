@@ -120,4 +120,26 @@ public class SalesService {
 		salesRepo.deleteById(id);
 		return ResponseEntity.status(200).body(new ApiResponse<>(null, "Sale deleted successfully", true, Instant.now()));
 	}
+
+	@Transactional
+	public ResponseEntity<ApiResponse<Sale>> updateSale(String id, UpdateSaleRequest request) {
+		Sale sale = salesRepo.findById(id)
+				.orElseThrow(() -> new EntityNotFoundException("Sale not found with id: " + id));
+
+		if (request.item() != null && !request.item().trim().isEmpty()) {
+			sale.setItem(request.item().trim());
+		}
+		if (request.quantity() != null && request.quantity() > 0) {
+			sale.setQuantity(request.quantity());
+		}
+		if (request.unit_price() != null && request.unit_price().compareTo(BigDecimal.ZERO) > 0) {
+			sale.setUnit_price(request.unit_price());
+		}
+
+		BigDecimal qty = BigDecimal.valueOf(sale.getQuantity());
+		sale.setTotal_amount(sale.getUnit_price().multiply(qty));
+
+		Sale saved = salesRepo.save(sale);
+		return ResponseEntity.ok(new ApiResponse<>(saved, "Sale updated successfully ✅", true, Instant.now()));
+	}
 }
