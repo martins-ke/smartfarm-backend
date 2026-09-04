@@ -134,28 +134,32 @@ public class User {
 	}
 	public Set<String> getPrivileges() {
 		Set<String> result = new HashSet<>();
-		if (this.privilegesRaw != null && !this.privilegesRaw.trim().isEmpty()) {
-			for (String p : this.privilegesRaw.split(",")) {
-				String trimmed = p.trim();
-				if (!trimmed.isEmpty()) {
-					result.add(trimmed);
+		if (this.privilegesRaw != null) {
+			if (!this.privilegesRaw.trim().isEmpty() && !"NONE".equalsIgnoreCase(this.privilegesRaw.trim())) {
+				for (String p : this.privilegesRaw.split(",")) {
+					String trimmed = p.trim();
+					if (!trimmed.isEmpty() && !"NONE".equalsIgnoreCase(trimmed)) {
+						result.add(trimmed);
+					}
 				}
 			}
-		} else {
-			if ("MANAGER".equalsIgnoreCase(this.role)) {
-				result.add("CAN_CREATE_SUPERVISORS");
-				result.add("CAN_VIEW_FINANCIALS");
-			} else if ("SUPERVISOR".equalsIgnoreCase(this.role)) {
-				result.add("CAN_RECORD_HARVEST");
-				result.add("CAN_LOG_ACTIVITIES");
-				result.add("CAN_USE_INVENTORY");
-			}
+			return result;
+		}
+
+		// Only fall back to defaults if privilegesRaw has NEVER been set (is null)
+		if ("MANAGER".equalsIgnoreCase(this.role)) {
+			result.add("CAN_CREATE_SUPERVISORS");
+			result.add("CAN_VIEW_FINANCIALS");
+		} else if ("SUPERVISOR".equalsIgnoreCase(this.role)) {
+			result.add("CAN_RECORD_HARVEST");
+			result.add("CAN_LOG_ACTIVITIES");
+			result.add("CAN_USE_INVENTORY");
 		}
 		return result;
 	}
 	public void setPrivileges(Set<String> privileges) {
 		if (privileges == null || privileges.isEmpty()) {
-			this.privilegesRaw = "";
+			this.privilegesRaw = "NONE";
 		} else {
 			this.privilegesRaw = String.join(",", privileges);
 		}
