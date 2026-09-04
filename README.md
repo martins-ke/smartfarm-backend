@@ -9,13 +9,13 @@ Enterprise-grade, zero-cost cloud backend API for **SmartFarm**, designed for mu
 
 ---
 
-## 📚 Official SDLC Documentation
+## 📚 Official SDLC Documentation & Architectural Specifications (PDFs)
 
-All specifications, architectural blueprints, and workflow flowcharts are located in the [`/docs`](docs/) directory:
+All official documents are publication-grade PDF files located in the [`/docs`](docs/) directory:
 
-- 📄 **[Software Requirements Specification (SRS)](docs/SRS_Document.md)** ([PDF Version](docs/SmartFarm_SRS_Document.pdf))
-- 🏗️ **[System Design & Architecture (SDD)](docs/System_Design_and_Architecture.md)** ([PDF Version](docs/SmartFarm_System_Design_and_Architecture.pdf))
-- 📊 **[Complete System Workflow Flowcharts (12 Workflows)](docs/SmartFarm_Complete_System_Flowcharts.md)** ([PDF Version](docs/SmartFarm_Complete_System_Flowcharts.pdf))
+- 📄 **[Software Requirements Specification (SRS) PDF](docs/SmartFarm_SRS_Document.pdf)**
+- 🏗️ **[System Design & Architecture (SDD) PDF](docs/SmartFarm_System_Design_and_Architecture.pdf)**
+- 📊 **[Complete System Workflow Flowcharts (12 Workflows) PDF](docs/SmartFarm_Complete_System_Flowcharts.pdf)**
 
 ---
 
