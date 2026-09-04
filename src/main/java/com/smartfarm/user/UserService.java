@@ -143,7 +143,7 @@ public class UserService {
 		String identifier = request.username().trim();
 		String password = request.password().trim();
 
-		User user = userRepo.findOptionalByUsername(identifier)
+		User user = userRepo.findByUsername(identifier)
 				.orElseGet(() -> userRepo.findByEmail(identifier).orElse(null));
 
 		if (user == null) {
