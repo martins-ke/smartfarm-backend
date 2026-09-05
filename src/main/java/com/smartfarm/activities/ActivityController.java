@@ -44,6 +44,18 @@ public class ActivityController {
 		return activityService.updateActivity(id, request, effectiveUserId, effectiveUserRole);
 	}
 
+	@org.springframework.web.bind.annotation.GetMapping("/{id}/labor")
+	public ResponseEntity<ApiResponse<java.util.List<ActivityLaborAssignment>>> getLaborAssignments(@org.springframework.web.bind.annotation.PathVariable String id) {
+		return activityService.getLaborAssignments(id);
+	}
+
+	@PostMapping("/{id}/labor")
+	public ResponseEntity<ApiResponse<?>> assignLabor(
+			@org.springframework.web.bind.annotation.PathVariable String id,
+			@RequestBody AssignLaborRequest request) {
+		return activityService.assignLaborToActivity(id, request);
+	}
+
 	@org.springframework.web.bind.annotation.DeleteMapping("/{id}")
 	public ResponseEntity<ApiResponse<Void>> deleteActivity(
 			@org.springframework.web.bind.annotation.PathVariable String id,

@@ -1,5 +1,7 @@
 package com.smartfarm.customers;
 
+import java.math.BigDecimal;
+
 import jakarta.validation.constraints.NotBlank;
 
 public record CustomerRequest(
@@ -9,7 +11,7 @@ public record CustomerRequest(
 		String contact,
 		String id_number,
 		String address,
-		String status
-		) {
-
-}
+		String status,
+		BigDecimal credit_limit,
+		String category
+) {}

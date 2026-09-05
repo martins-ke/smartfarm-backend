@@ -19,11 +19,50 @@ public class ActivityService {
 	private final ActivityRepository activityRepo;
 	private final ProjectRepository projectRepo;
 	private final com.smartfarm.user.UserRepository userRepo;
+	private final com.smartfarm.employees.EmployeeRepository employeeRepo;
+	private final ActivityLaborAssignmentRepository laborRepo;
 	
-	public ActivityService(ActivityRepository activityRepo, ProjectRepository projectRepo, com.smartfarm.user.UserRepository userRepo) {
+	public ActivityService(ActivityRepository activityRepo, ProjectRepository projectRepo, com.smartfarm.user.UserRepository userRepo,
+			com.smartfarm.employees.EmployeeRepository employeeRepo, ActivityLaborAssignmentRepository laborRepo) {
 		this.activityRepo = activityRepo;
 		this.projectRepo = projectRepo;
 		this.userRepo = userRepo;
+		this.employeeRepo = employeeRepo;
+		this.laborRepo = laborRepo;
+	}
+
+	public ResponseEntity<ApiResponse<java.util.List<ActivityLaborAssignment>>> getLaborAssignments(String activityId) {
+		java.util.List<ActivityLaborAssignment> list = laborRepo.findByActivityId(activityId);
+		return ResponseEntity.ok(new ApiResponse<>(list, "Labor assignments retrieved ✅", true, Instant.now()));
+	}
+
+	public ResponseEntity<ApiResponse<?>> assignLaborToActivity(String activityId, AssignLaborRequest req) {
+		Activity activity = activityRepo.findById(activityId)
+				.orElseThrow(() -> new EntityNotFoundException("Activity not found with ID: " + activityId));
+
+		com.smartfarm.employees.Employee employee = employeeRepo.findById(req.employeeId())
+				.orElseThrow(() -> new EntityNotFoundException("Employee not found with ID: " + req.employeeId()));
+
+		if (!"ACTIVE".equalsIgnoreCase(employee.getStatus())) {
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Cannot assign inactive employee to tasks!", false, Instant.now()));
+		}
+
+		double hours = req.hoursWorked() > 0 ? req.hoursWorked() : 8.0;
+		java.math.BigDecimal daily = employee.getDailyRate() != null ? employee.getDailyRate() : java.math.BigDecimal.ZERO;
+		java.math.BigDecimal hourly = daily.divide(java.math.BigDecimal.valueOf(8), 2, java.math.RoundingMode.HALF_UP);
+		java.math.BigDecimal wage = hourly.multiply(java.math.BigDecimal.valueOf(hours)).setScale(2, java.math.RoundingMode.HALF_UP);
+
+		ActivityLaborAssignment assignment = new ActivityLaborAssignment(
+			activity,
+			employee,
+			req.assignmentDate() != null ? req.assignmentDate() : LocalDate.now(),
+			hours,
+			wage,
+			req.notes()
+		);
+
+		ActivityLaborAssignment saved = laborRepo.save(assignment);
+		return ResponseEntity.status(201).body(new ApiResponse<>(saved, "Labor assigned & wage computed successfully ✅", true, Instant.now()));
 	}
 	
 	public ResponseEntity<ApiResponse<Activity>> recordActivity(CreateActivityRequest request, String userId, String userRole){

@@ -33,6 +33,11 @@ public class Sale {
 	private LocalDate added_on;
 	private BigDecimal total_amount;
 
+	private BigDecimal amountPaid;
+	private BigDecimal balanceDue;
+	private String paymentMode; // "CASH", "MPESA", "BANK_TRANSFER", "CREDIT_LEDGER"
+	private String paymentStatus; // "PAID_IN_FULL", "PARTIAL_PAYMENT", "CREDIT_UNPAID"
+
 	@ManyToOne
 	@JoinColumn(name = "project_id")
 	@JsonIgnore
@@ -43,9 +48,9 @@ public class Sale {
 	private Customer customer;
 	
 	public Sale() {}
+
 	public Sale(String id, String item, float quantity, BigDecimal unit_price, LocalDate added_on,
 			BigDecimal total_amount, Project project, Customer customer) {
-		super();
 		this.id = id;
 		this.item = item;
 		this.quantity = quantity;
@@ -53,56 +58,126 @@ public class Sale {
 		this.customer = customer;
 		this.added_on = added_on;
 		this.total_amount = total_amount;
+		this.amountPaid = total_amount;
+		this.balanceDue = BigDecimal.ZERO;
+		this.paymentMode = "CASH";
+		this.paymentStatus = "PAID_IN_FULL";
 		this.project = project;
 	}
+
+	public Sale(String id, String item, float quantity, BigDecimal unit_price, LocalDate added_on,
+			BigDecimal total_amount, BigDecimal amountPaid, BigDecimal balanceDue, String paymentMode,
+			String paymentStatus, Project project, Customer customer) {
+		this.id = id;
+		this.item = item;
+		this.quantity = quantity;
+		this.unit_price = unit_price;
+		this.added_on = added_on;
+		this.total_amount = total_amount;
+		this.amountPaid = amountPaid != null ? amountPaid : total_amount;
+		this.balanceDue = balanceDue != null ? balanceDue : BigDecimal.ZERO;
+		this.paymentMode = paymentMode != null ? paymentMode : "CASH";
+		this.paymentStatus = paymentStatus != null ? paymentStatus : "PAID_IN_FULL";
+		this.project = project;
+		this.customer = customer;
+	}
+
 	public String getId() {
 		return id;
 	}
+
 	public void setId(String id) {
 		this.id = id;
 	}
+
 	public String getItem() {
 		return item;
 	}
+
 	public void setItem(String item) {
 		this.item = item;
 	}
+
 	public float getQuantity() {
 		return quantity;
 	}
+
 	public void setQuantity(float quantity) {
 		this.quantity = quantity;
 	}
+
 	public BigDecimal getUnit_price() {
 		return unit_price;
 	}
+
 	public void setUnit_price(BigDecimal unit_price) {
 		this.unit_price = unit_price;
 	}
+
 	public Customer getCustomer() {
 		return customer;
 	}
+
 	public void setCustomer(Customer customer) {
 		this.customer = customer;
 	}
+
 	public LocalDate getAdded_on() {
 		return added_on;
 	}
+
 	public void setAdded_on(LocalDate added_on) {
 		this.added_on = added_on;
 	}
+
 	public BigDecimal getTotal_amount() {
 		return total_amount;
 	}
+
 	public void setTotal_amount(BigDecimal total_amount) {
 		this.total_amount = total_amount;
 	}
+
+	public BigDecimal getAmountPaid() {
+		return amountPaid != null ? amountPaid : total_amount;
+	}
+
+	public void setAmountPaid(BigDecimal amountPaid) {
+		this.amountPaid = amountPaid;
+	}
+
+	public BigDecimal getBalanceDue() {
+		return balanceDue != null ? balanceDue : BigDecimal.ZERO;
+	}
+
+	public void setBalanceDue(BigDecimal balanceDue) {
+		this.balanceDue = balanceDue;
+	}
+
+	public String getPaymentMode() {
+		return paymentMode != null ? paymentMode : "CASH";
+	}
+
+	public void setPaymentMode(String paymentMode) {
+		this.paymentMode = paymentMode;
+	}
+
+	public String getPaymentStatus() {
+		return paymentStatus != null ? paymentStatus : "PAID_IN_FULL";
+	}
+
+	public void setPaymentStatus(String paymentStatus) {
+		this.paymentStatus = paymentStatus;
+	}
+
 	public Project getProject() {
 		return project;
 	}
+
 	public void setProject(Project project) {
 		this.project = project;
 	}
+
 	@JsonProperty("project_id")
 	public String getProjectId() {
 		return project != null ? project.getId() : null;

@@ -27,7 +27,13 @@ public class Activity {
 	private String notes;
 	@ManyToOne
 	@JoinColumn(name = "project_id")
+	@com.fasterxml.jackson.annotation.JsonIgnore
 	private Project project;
+
+	@com.fasterxml.jackson.annotation.JsonProperty("project_id")
+	public String getProjectId() {
+		return project != null ? project.getId() : null;
+	}
 	
 	public Activity() {}
 

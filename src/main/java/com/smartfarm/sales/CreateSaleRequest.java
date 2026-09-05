@@ -17,7 +17,8 @@ public record CreateSaleRequest(
 		BigDecimal unit_price,
 		@NotNull(message = "project id required!")
 		String project_id,
-		CustomerRequest customer
-		) {
-
-}
+		String customer_id, // existing customer ID
+		CustomerRequest customer, // or inline customer creation
+		BigDecimal amount_paid, // amount paid at checkout
+		String payment_mode // "CASH", "MPESA", "BANK_TRANSFER", "CREDIT_LEDGER"
+) {}

@@ -69,15 +69,53 @@ public class SalesService {
 			}
 		}
 		
-		// Enforce business rule: A project MUST have enough harvested quantity to cover the sale
-		float totalHarvested = harvestRepo.totalHarvestQuantityByProjectId(project.getId());
-		float totalSold = salesRepo.totalSoldQuantityByProjectId(project.getId());
+		// Enforce business rule: A project MUST have enough harvested quantity to cover the sale of the specific item
+		String requestedItem = request.item() != null ? request.item().trim() : "";
+		float totalHarvestedForItem = harvestRepo.totalHarvestQuantityByProjectIdAndItem(project.getId(), requestedItem);
+		float totalSoldForItem = salesRepo.totalSoldQuantityByProjectIdAndItem(project.getId(), requestedItem);
 		float quantityRequested = request.quantity();
-		
-		if (totalHarvested < (totalSold + quantityRequested)) {
-			float available = Math.max(0, totalHarvested - totalSold);
+
+		// If no exact match, check case-insensitive or partial match among project's harvests
+		if (totalHarvestedForItem == 0) {
+			java.util.List<com.smartfarm.harvest.Harvest> harvests = harvestRepo.findByProjectId(project.getId());
+			if (harvests.isEmpty()) {
+				return ResponseEntity.status(400).body(new ApiResponse<>(null, 
+					"Sale failed! No harvest has been recorded for this project yet. Please record a harvest before selling.", false, Instant.now()));
+			}
+
+			// Try to find matching harvest record by name ignoring case or contains
+			com.smartfarm.harvest.Harvest matchedHarvest = harvests.stream()
+				.filter(h -> h.getItem() != null && (
+					h.getItem().trim().equalsIgnoreCase(requestedItem) ||
+					h.getItem().toLowerCase().contains(requestedItem.toLowerCase()) ||
+					requestedItem.toLowerCase().contains(h.getItem().toLowerCase())
+				))
+				.findFirst()
+				.orElse(null);
+
+			if (matchedHarvest != null) {
+				totalHarvestedForItem = harvestRepo.totalHarvestQuantityByProjectIdAndItem(project.getId(), matchedHarvest.getItem());
+				totalSoldForItem = salesRepo.totalSoldQuantityByProjectIdAndItem(project.getId(), matchedHarvest.getItem());
+			} else if (harvests.size() == 1) {
+				// If project has only one harvested crop type, use that
+				com.smartfarm.harvest.Harvest singleHarvest = harvests.get(0);
+				totalHarvestedForItem = harvestRepo.totalHarvestQuantityByProjectIdAndItem(project.getId(), singleHarvest.getItem());
+				totalSoldForItem = salesRepo.totalSoldQuantityByProjectIdAndItem(project.getId(), singleHarvest.getItem());
+			} else {
+				String availableItems = harvests.stream()
+					.map(com.smartfarm.harvest.Harvest::getItem)
+					.filter(java.util.Objects::nonNull)
+					.distinct()
+					.collect(java.util.stream.Collectors.joining(", "));
+				return ResponseEntity.status(400).body(new ApiResponse<>(null, 
+					"Sale failed! No harvest recorded for '" + requestedItem + "'. Available harvested items in this project: " + availableItems, false, Instant.now()));
+			}
+		}
+
+		if (totalHarvestedForItem < (totalSoldForItem + quantityRequested)) {
+			float available = Math.max(0, totalHarvestedForItem - totalSoldForItem);
 			return ResponseEntity.status(400).body(new ApiResponse<>(null, 
-				"Sale failed! You cannot sell more than what you have harvested. Only " + available + " available in stock.", false, Instant.now()));
+				"Sale failed! You cannot sell more than what you have harvested for " + requestedItem + ". Only " + available + " available in stock.", false, Instant.now()));
 		}
 
 		long count = salesRepo.count();
@@ -91,7 +129,9 @@ public class SalesService {
 		BigDecimal total_amount = request.unit_price().multiply(quantity);
 		Customer customer = null;
 		
-		if (request.customer() != null && request.customer().name() != null && !request.customer().name().trim().isEmpty()) {
+		if (request.customer_id() != null && !request.customer_id().trim().isEmpty()) {
+			customer = customerRepo.findById(request.customer_id().trim()).orElse(null);
+		} else if (request.customer() != null && request.customer().name() != null && !request.customer().name().trim().isEmpty()) {
 			String status = request.customer().status() != null ? request.customer().status().trim().toLowerCase() : "new";
 			String contact = request.customer().contact() != null ? request.customer().contact().trim() : null;
 			String idNumber = request.customer().id_number() != null ? request.customer().id_number().trim() : null;
@@ -116,9 +156,52 @@ public class SalesService {
 				}
 			}
 		}
+
+		BigDecimal amountPaid = request.amount_paid() != null ? request.amount_paid() : total_amount;
+		if (amountPaid.compareTo(BigDecimal.ZERO) < 0) {
+			amountPaid = BigDecimal.ZERO;
+		}
+		if (amountPaid.compareTo(total_amount) > 0) {
+			amountPaid = total_amount;
+		}
+
+		BigDecimal balanceDue = total_amount.subtract(amountPaid);
+		String paymentMode = request.payment_mode() != null ? request.payment_mode().toUpperCase() : "CASH";
+		String paymentStatus = "PAID_IN_FULL";
+		if (amountPaid.compareTo(BigDecimal.ZERO) == 0) {
+			paymentStatus = "CREDIT_UNPAID";
+		} else if (balanceDue.compareTo(BigDecimal.ZERO) > 0) {
+			paymentStatus = "PARTIAL_PAYMENT";
+		}
+
+		if (balanceDue.compareTo(BigDecimal.ZERO) > 0 && customer == null) {
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, 
+				"Sale failed! When the amount paid (Ksh " + amountPaid + ") is less than the required amount (Ksh " + total_amount + "), a customer must be attached to track the balance due of Ksh " + balanceDue + ".", false, Instant.now()));
+		}
+
+		if (customer != null) {
+			if ("BLOCKED".equalsIgnoreCase(customer.getCreditStatus()) && balanceDue.compareTo(BigDecimal.ZERO) > 0) {
+				return ResponseEntity.status(400).body(new ApiResponse<>(null, "Customer credit is BLOCKED due to exceeding credit limit! Full payment required to proceed.", false, Instant.now()));
+			}
+
+			customer.setTotalPurchases(customer.getTotalPurchases().add(total_amount));
+			customer.setTotalPaid(customer.getTotalPaid().add(amountPaid));
+			BigDecimal newDebt = customer.getTotalPurchases().subtract(customer.getTotalPaid());
+			if (newDebt.compareTo(BigDecimal.ZERO) < 0) newDebt = BigDecimal.ZERO;
+			customer.setOutstandingDebt(newDebt);
+
+			if (newDebt.compareTo(BigDecimal.ZERO) == 0) {
+				customer.setCreditStatus("CLEAR");
+			} else if (customer.getCreditLimit().compareTo(BigDecimal.ZERO) > 0 && newDebt.compareTo(customer.getCreditLimit()) > 0) {
+				customer.setCreditStatus("BLOCKED");
+			} else {
+				customer.setCreditStatus("HAS_DEBT");
+			}
+			customerRepo.save(customer);
+		}
 		
-		Sale sale = new Sale(id, request.item(), request.quantity(), request.unit_price(), LocalDate.now(), total_amount, project, customer);
-		return ResponseEntity.status(201).body(new ApiResponse<>(salesRepo.save(sale), "Sale recorded successfully ✅", true, Instant.now()));  
+		Sale sale = new Sale(id, request.item(), request.quantity(), request.unit_price(), LocalDate.now(), total_amount, amountPaid, balanceDue, paymentMode, paymentStatus, project, customer);
+		return ResponseEntity.status(201).body(new ApiResponse<>(salesRepo.save(sale), "Sale recorded & customer ledger updated successfully ✅", true, Instant.now()));  
 	}
 
 	public ResponseEntity<ApiResponse<Sale>> createSale(CreateSaleRequest request) {

@@ -44,6 +44,18 @@ final class HarvestController {
 		return harvestService.updateHarvest(id, request, effectiveUserId, effectiveUserRole);
 	}
 
+	@org.springframework.web.bind.annotation.GetMapping("/project/{projectId}")
+	final ResponseEntity<ApiResponse<java.util.List<Harvest>>> getHarvestByProjectId(
+			@org.springframework.web.bind.annotation.PathVariable String projectId) {
+		return harvestService.getHarvestByProjectId(projectId);
+	}
+
+	@org.springframework.web.bind.annotation.GetMapping("/{id}")
+	final ResponseEntity<ApiResponse<Harvest>> getHarvestById(
+			@org.springframework.web.bind.annotation.PathVariable String id) {
+		return harvestService.getHarvestById(id);
+	}
+
 	@org.springframework.web.bind.annotation.DeleteMapping("/{id}")
 	final ResponseEntity<ApiResponse<Void>> deleteHarvest(
 			@org.springframework.web.bind.annotation.PathVariable String id,

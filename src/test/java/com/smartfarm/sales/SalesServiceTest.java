@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -68,12 +69,12 @@ class SalesServiceTest {
 	@Test
 	void createSale_withNewCustomer_successfullyCreatesSaleAndCustomer() {
 		when(projectRepo.findById("P001")).thenReturn(Optional.of(mockProject));
-		when(harvestRepo.totalHarvestQuantityByProjectId("P001")).thenReturn(100.0f);
-		when(salesRepo.totalSoldQuantityByProjectId("P001")).thenReturn(0.0f);
+		when(harvestRepo.totalHarvestQuantityByProjectIdAndItem(eq("P001"), anyString())).thenReturn(100.0f);
+		when(salesRepo.totalSoldQuantityByProjectIdAndItem(eq("P001"), anyString())).thenReturn(0.0f);
 		when(salesRepo.count()).thenReturn(0L);
 		when(salesRepo.existsById(anyString())).thenReturn(false);
 
-		CustomerRequest custReq = new CustomerRequest("School cafeteria", "0784463737", "12345678", "Kitale", "new");
+		CustomerRequest custReq = new CustomerRequest("School cafeteria", "0784463737", "12345678", "Kitale", "new", BigDecimal.ZERO, "General");
 		Customer savedCustomer = new Customer("C001", "School cafeteria", "0784463737", "12345678", "Kitale", true);
 
 		when(customerRepo.existsByContact("0784463737")).thenReturn(false);
@@ -81,7 +82,7 @@ class SalesServiceTest {
 		when(customerService.saveCustomer(custReq)).thenReturn(savedCustomer);
 		when(salesRepo.save(any(Sale.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		CreateSaleRequest request = new CreateSaleRequest("Milk", 20.0f, new BigDecimal("75.00"), "P001", custReq);
+		CreateSaleRequest request = new CreateSaleRequest("Milk", 20.0f, new BigDecimal("75.00"), "P001", null, custReq, new BigDecimal("1500.00"), "CASH");
 		ResponseEntity<ApiResponse<Sale>> response = salesService.createSale(request);
 
 		assertEquals(HttpStatus.CREATED, response.getStatusCode());
@@ -102,12 +103,12 @@ class SalesServiceTest {
 	@Test
 	void createSale_withDuplicateCustomerContact_returnsBadRequest() {
 		when(projectRepo.findById("P001")).thenReturn(Optional.of(mockProject));
-		when(harvestRepo.totalHarvestQuantityByProjectId("P001")).thenReturn(100.0f);
-		when(salesRepo.totalSoldQuantityByProjectId("P001")).thenReturn(0.0f);
-		CustomerRequest custReq = new CustomerRequest("School cafeteria", "0784463737", "12345678", "Kitale", "new");
+		when(harvestRepo.totalHarvestQuantityByProjectIdAndItem(eq("P001"), anyString())).thenReturn(100.0f);
+		when(salesRepo.totalSoldQuantityByProjectIdAndItem(eq("P001"), anyString())).thenReturn(0.0f);
+		CustomerRequest custReq = new CustomerRequest("School cafeteria", "0784463737", "12345678", "Kitale", "new", BigDecimal.ZERO, "General");
 		when(customerRepo.existsByContact("0784463737")).thenReturn(true);
 
-		CreateSaleRequest request = new CreateSaleRequest("Milk", 20.0f, new BigDecimal("75.00"), "P001", custReq);
+		CreateSaleRequest request = new CreateSaleRequest("Milk", 20.0f, new BigDecimal("75.00"), "P001", null, custReq, new BigDecimal("1500.00"), "CASH");
 		ResponseEntity<ApiResponse<Sale>> response = salesService.createSale(request);
 
 		assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
@@ -120,17 +121,17 @@ class SalesServiceTest {
 	@Test
 	void createSale_withExistingCustomer_attachesFoundCustomer() {
 		when(projectRepo.findById("P001")).thenReturn(Optional.of(mockProject));
-		when(harvestRepo.totalHarvestQuantityByProjectId("P001")).thenReturn(100.0f);
-		when(salesRepo.totalSoldQuantityByProjectId("P001")).thenReturn(0.0f);
+		when(harvestRepo.totalHarvestQuantityByProjectIdAndItem(eq("P001"), anyString())).thenReturn(100.0f);
+		when(salesRepo.totalSoldQuantityByProjectIdAndItem(eq("P001"), anyString())).thenReturn(0.0f);
 		when(salesRepo.count()).thenReturn(5L);
 		when(salesRepo.existsById(anyString())).thenReturn(false);
 
 		Customer existingCustomer = new Customer("C001", "School cafeteria", "0784463737", "12345678", "Kitale", true);
-		CustomerRequest custReq = new CustomerRequest("School cafeteria", "0784463737", "12345678", "Kitale", "exist");
+		CustomerRequest custReq = new CustomerRequest("School cafeteria", "0784463737", "12345678", "Kitale", "exist", BigDecimal.ZERO, "General");
 		when(customerRepo.findByContact("0784463737")).thenReturn(Optional.of(existingCustomer));
 		when(salesRepo.save(any(Sale.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		CreateSaleRequest request = new CreateSaleRequest("Eggs", 10.0f, new BigDecimal("400.00"), "P001", custReq);
+		CreateSaleRequest request = new CreateSaleRequest("Eggs", 10.0f, new BigDecimal("400.00"), "P001", null, custReq, new BigDecimal("4000.00"), "CASH");
 		ResponseEntity<ApiResponse<Sale>> response = salesService.createSale(request);
 
 		assertEquals(HttpStatus.CREATED, response.getStatusCode());
@@ -142,13 +143,13 @@ class SalesServiceTest {
 	@Test
 	void createSale_withoutCustomer_successfullyCreatesSale() {
 		when(projectRepo.findById("P001")).thenReturn(Optional.of(mockProject));
-		when(harvestRepo.totalHarvestQuantityByProjectId("P001")).thenReturn(100.0f);
-		when(salesRepo.totalSoldQuantityByProjectId("P001")).thenReturn(0.0f);
+		when(harvestRepo.totalHarvestQuantityByProjectIdAndItem(eq("P001"), anyString())).thenReturn(100.0f);
+		when(salesRepo.totalSoldQuantityByProjectIdAndItem(eq("P001"), anyString())).thenReturn(0.0f);
 		when(salesRepo.count()).thenReturn(1L);
 		when(salesRepo.existsById(anyString())).thenReturn(false);
 		when(salesRepo.save(any(Sale.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		CreateSaleRequest request = new CreateSaleRequest("Tomatoes", 50.0f, new BigDecimal("80.00"), "P001", null);
+		CreateSaleRequest request = new CreateSaleRequest("Tomatoes", 50.0f, new BigDecimal("80.00"), "P001", null, null, new BigDecimal("4000.00"), "CASH");
 		ResponseEntity<ApiResponse<Sale>> response = salesService.createSale(request);
 
 		assertEquals(HttpStatus.CREATED, response.getStatusCode());
@@ -157,10 +158,53 @@ class SalesServiceTest {
 	}
 
 	@Test
+	void createSale_whenPaidLessThanRequiredWithoutCustomer_returnsBadRequest() {
+		when(projectRepo.findById("P001")).thenReturn(Optional.of(mockProject));
+		when(harvestRepo.totalHarvestQuantityByProjectIdAndItem(eq("P001"), anyString())).thenReturn(100.0f);
+		when(salesRepo.totalSoldQuantityByProjectIdAndItem(eq("P001"), anyString())).thenReturn(0.0f);
+
+		// Total required = 50 * 80 = 4000, but amount_paid is 2000 without customer
+		CreateSaleRequest request = new CreateSaleRequest("Tomatoes", 50.0f, new BigDecimal("80.00"), "P001", null, null, new BigDecimal("2000.00"), "CASH");
+		ResponseEntity<ApiResponse<Sale>> response = salesService.createSale(request);
+
+		assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+		assertFalse(response.getBody().success());
+		assertTrue(response.getBody().message().contains("customer must be attached"));
+		verify(salesRepo, never()).save(any());
+	}
+
+	@Test
+	void createSale_whenPaidLessThanRequiredWithCustomer_successfullyCreatesPartialSale() {
+		when(projectRepo.findById("P001")).thenReturn(Optional.of(mockProject));
+		when(harvestRepo.totalHarvestQuantityByProjectIdAndItem(eq("P001"), anyString())).thenReturn(100.0f);
+		when(salesRepo.totalSoldQuantityByProjectIdAndItem(eq("P001"), anyString())).thenReturn(0.0f);
+		when(salesRepo.count()).thenReturn(2L);
+		when(salesRepo.existsById(anyString())).thenReturn(false);
+
+		Customer customer = new Customer("C002", "Jane Doe", "0711223344", "87654321", "Eldoret", true);
+		when(customerRepo.findById("C002")).thenReturn(Optional.of(customer));
+		when(salesRepo.save(any(Sale.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		// Total required = 50 * 80 = 4000, amount_paid = 2500, balance = 1500
+		CreateSaleRequest request = new CreateSaleRequest("Tomatoes", 50.0f, new BigDecimal("80.00"), "P001", "C002", null, new BigDecimal("2500.00"), "CASH");
+		ResponseEntity<ApiResponse<Sale>> response = salesService.createSale(request);
+
+		assertEquals(HttpStatus.CREATED, response.getStatusCode());
+		assertTrue(response.getBody().success());
+		Sale sale = response.getBody().body();
+		assertNotNull(sale);
+		assertEquals(0, new BigDecimal("2500.00").compareTo(sale.getAmountPaid()));
+		assertEquals(0, new BigDecimal("1500.00").compareTo(sale.getBalanceDue()));
+		assertEquals("PARTIAL_PAYMENT", sale.getPaymentStatus());
+		assertEquals(customer, sale.getCustomer());
+		assertEquals(0, new BigDecimal("1500.00").compareTo(customer.getOutstandingDebt()));
+	}
+
+	@Test
 	void createSale_whenProjectNotFound_throwsEntityNotFoundException() {
 		when(projectRepo.findById("UNKNOWN")).thenReturn(Optional.empty());
 
-		CreateSaleRequest request = new CreateSaleRequest("Tomatoes", 10.0f, new BigDecimal("80.00"), "UNKNOWN", null);
+		CreateSaleRequest request = new CreateSaleRequest("Tomatoes", 10.0f, new BigDecimal("80.00"), "UNKNOWN", null, null, new BigDecimal("800.00"), "CASH");
 		assertThrows(EntityNotFoundException.class, () -> salesService.createSale(request));
 	}
 

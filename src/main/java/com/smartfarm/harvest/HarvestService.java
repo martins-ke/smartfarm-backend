@@ -106,4 +106,15 @@ public class HarvestService {
 	public ResponseEntity<ApiResponse<Void>> deleteHarvest(String id) {
 		return deleteHarvest(id, null, null);
 	}
+
+	public ResponseEntity<ApiResponse<java.util.List<Harvest>>> getHarvestByProjectId(String projectId) {
+		java.util.List<Harvest> list = harvestRepo.findByProjectId(projectId);
+		return ResponseEntity.ok(new ApiResponse<>(list, "Harvest records retrieved successfully", true, Instant.now()));
+	}
+
+	public ResponseEntity<ApiResponse<Harvest>> getHarvestById(String id) {
+		Harvest harvest = harvestRepo.findById(id)
+				.orElseThrow(() -> new EntityNotFoundException("Harvest not found with ID: " + id));
+		return ResponseEntity.ok(new ApiResponse<>(harvest, "Harvest record retrieved successfully", true, Instant.now()));
+	}
 }
