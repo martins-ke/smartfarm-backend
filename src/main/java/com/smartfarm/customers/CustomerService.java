@@ -17,9 +17,11 @@ import jakarta.persistence.EntityNotFoundException;
 public class CustomerService {
 
 	private final CustomerRepository customerRepo;
+	private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 	
-	public CustomerService(CustomerRepository customerRepo) {
+	public CustomerService(CustomerRepository customerRepo, org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
 		this.customerRepo = customerRepo;
+		this.jdbcTemplate = jdbcTemplate;
 	}
 	
 	@Transactional
@@ -49,7 +51,20 @@ public class CustomerService {
 		if (request.category() != null && !request.category().trim().isEmpty()) {
 			customer.setCategory(request.category().trim());
 		}
-		return customerRepo.save(customer); 
+		Customer saved = customerRepo.save(customer);
+
+		// Mirror to legacy singular customer table to ensure foreign keys on older MySQL schemas resolve without error
+		try {
+			jdbcTemplate.update(
+				"INSERT INTO customer (id, name, contact, id_number, address, is_active) VALUES (?, ?, ?, ?, ?, ?) "
+				+ "ON DUPLICATE KEY UPDATE name = VALUES(name), contact = VALUES(contact), id_number = VALUES(id_number), address = VALUES(address)",
+				saved.getId(), saved.getName(), saved.getContact(), saved.getIdNumber(), saved.getAddress(), saved.isActive()
+			);
+		} catch (Exception e) {
+			// If legacy table doesn't exist or isn't needed, safe to ignore
+		}
+
+		return saved;
 	}
 	
 	public ResponseEntity<ApiResponse<List<Customer>>> getAllCustomers() {

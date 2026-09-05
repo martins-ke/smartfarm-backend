@@ -63,9 +63,21 @@ public class DatabaseSchemaInitializer implements ApplicationRunner {
         addColumnSafely("customers", "credit_status", "VARCHAR(255) DEFAULT 'CLEAR'");
         addColumnSafely("customers", "category", "VARCHAR(255) DEFAULT 'General Buyer'");
 
-        // Migrate any legacy rows from singular 'customer' table if present
+        // Ensure legacy customer table exists for foreign key compatibility
+        executeSafely("CREATE TABLE IF NOT EXISTS customer ("
+                + "id VARCHAR(255) NOT NULL PRIMARY KEY, "
+                + "name VARCHAR(255), "
+                + "contact VARCHAR(255), "
+                + "id_number VARCHAR(255), "
+                + "address VARCHAR(255), "
+                + "is_active BOOLEAN DEFAULT TRUE)");
+
+        // Bi-directional sync between customer and customers tables
         executeSafely("INSERT IGNORE INTO customers (id, name, contact, id_number, address, is_active) "
                 + "SELECT id, name, contact, id_number, address, is_active FROM customer");
+
+        executeSafely("INSERT IGNORE INTO customer (id, name, contact, id_number, address, is_active) "
+                + "SELECT id, name, contact, id_number, address, is_active FROM customers");
 
         // Ensure suppliers and supplier_purchases exist
         executeSafely("CREATE TABLE IF NOT EXISTS suppliers ("
