@@ -35,9 +35,17 @@ public class CustomerService {
 				? request.address().trim()
 				: "-";
 
+		String idNumber = (request.id_number() != null && !request.id_number().trim().isEmpty())
+				? request.id_number().trim()
+				: null;
+
+		String contact = (request.contact() != null && !request.contact().trim().isEmpty())
+				? request.contact().trim()
+				: null;
+
 		BigDecimal creditLimit = request.credit_limit() != null ? request.credit_limit() : BigDecimal.ZERO;
 		
-		Customer customer = new Customer(id, request.name().trim(), request.contact().trim(), request.id_number(), address, true, creditLimit);
+		Customer customer = new Customer(id, request.name().trim(), contact, idNumber, address, true, creditLimit);
 		if (request.category() != null && !request.category().trim().isEmpty()) {
 			customer.setCategory(request.category().trim());
 		}
