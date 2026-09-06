@@ -24,9 +24,13 @@ import java.util.UUID;
 import java.time.temporal.ChronoUnit;
 
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class UserService {
+
+	private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
 	private final UserRepository userRepo;
 	private final CategoryRepository categoryRepo;
@@ -194,7 +198,8 @@ public class UserService {
 		try {
 			emailService.sendPasswordResetEmail(email, resetLink);
 		} catch (Exception e) {
-			return ResponseEntity.status(500).body(new ApiResponse<>(null, "Failed to send email. Check mail configuration.", false, Instant.now()));
+			log.error("Failed to send password reset email to {}: {}", email, e.getMessage(), e);
+			return ResponseEntity.status(500).body(new ApiResponse<>(null, "Failed to send email: " + (e.getMessage() != null ? e.getMessage() : "Check mail configuration."), false, Instant.now()));
 		}
 
 		return ResponseEntity.ok(new ApiResponse<>(null, "Password reset link has been sent to your email. Please check your inbox.", true, Instant.now()));
