@@ -63,6 +63,7 @@ public class User {
 		Set<String> privs = new HashSet<>();
 		if ("MANAGER".equalsIgnoreCase(this.role)) {
 			privs.add("CAN_CREATE_SUPERVISORS");
+			privs.add("CAN_ASSIGN_PRIVILEGES");
 			privs.add("CAN_VIEW_FINANCIALS");
 		} else if ("SUPERVISOR".equalsIgnoreCase(this.role)) {
 			privs.add("CAN_RECORD_HARVEST");

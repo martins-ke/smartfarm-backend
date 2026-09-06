@@ -114,4 +114,41 @@ class UserServiceTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody().success());
     }
+
+    @Test
+    void updatePrivileges_whenCallerIsManagerAndTargetIsSupervisor_succeeds() {
+        User manager = new User("MGR001", "manager1", "mgr@farm.com", "pass", "MANAGER", "ACTIVE", "ADMIN01");
+        supervisor.setManagerId("MGR001");
+
+        when(userRepo.findById("SUP002")).thenReturn(Optional.of(supervisor));
+        when(userRepo.findById("MGR001")).thenReturn(Optional.of(manager));
+        when(userRepo.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdatePrivilegesRequest request = new UpdatePrivilegesRequest(
+            java.util.Set.of("CAN_RECORD_HARVEST", "CAN_LOG_ACTIVITIES", "CAN_RECORD_SALES"),
+            5
+        );
+
+        ResponseEntity<ApiResponse<User>> response = userService.updatePrivileges("SUP002", request, "MGR001", "MANAGER");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertTrue(response.getBody().success());
+        assertEquals(5, response.getBody().body().getMaxProjectCapacity());
+        assertTrue(response.getBody().body().getPrivileges().contains("CAN_RECORD_SALES"));
+    }
+
+    @Test
+    void updatePrivileges_whenCallerIsManagerAndTargetIsManager_returnsForbidden() {
+        User manager1 = new User("MGR001", "manager1", "mgr1@farm.com", "pass", "MANAGER", "ACTIVE", "ADMIN01");
+        User manager2 = new User("MGR002", "manager2", "mgr2@farm.com", "pass", "MANAGER", "ACTIVE", "ADMIN01");
+
+        when(userRepo.findById("MGR002")).thenReturn(Optional.of(manager2));
+        when(userRepo.findById("MGR001")).thenReturn(Optional.of(manager1));
+
+        UpdatePrivilegesRequest request = new UpdatePrivilegesRequest(java.util.Set.of("CAN_CREATE_CATEGORIES"), 4);
+        ResponseEntity<ApiResponse<User>> response = userService.updatePrivileges("MGR002", request, "MGR001", "MANAGER");
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        assertFalse(response.getBody().success());
+    }
 }

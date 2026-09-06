@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.smartfarm.ApiResponse;
 
+import jakarta.validation.Valid;
+
 @RestController
 @RequestMapping("/suppliers")
 public class SupplierController {
@@ -33,7 +35,7 @@ public class SupplierController {
 	}
 
 	@PostMapping
-	public ResponseEntity<ApiResponse<?>> createSupplier(@RequestBody CreateSupplierRequest request) {
+	public ResponseEntity<ApiResponse<?>> createSupplier(@Valid @RequestBody CreateSupplierRequest request) {
 		return supplierService.createSupplier(request);
 	}
 
@@ -43,12 +45,12 @@ public class SupplierController {
 	}
 
 	@PostMapping("/purchases")
-	public ResponseEntity<ApiResponse<?>> recordPurchase(@RequestBody SupplierPurchaseRequest request) {
+	public ResponseEntity<ApiResponse<?>> recordPurchase(@Valid @RequestBody SupplierPurchaseRequest request) {
 		return supplierService.recordPurchase(request);
 	}
 
 	@PostMapping("/{id}/payments")
-	public ResponseEntity<ApiResponse<?>> recordPayment(@PathVariable String id, @RequestBody SupplierPaymentRequest request) {
+	public ResponseEntity<ApiResponse<?>> recordPayment(@PathVariable String id, @Valid @RequestBody SupplierPaymentRequest request) {
 		return supplierService.recordPayment(id, request);
 	}
 }

@@ -28,7 +28,7 @@ public class SalesController {
 	}
 	
 	@PostMapping("/create")
-	public ResponseEntity<ApiResponse<Sale>> createSale(
+	public ResponseEntity<ApiResponse<Sale>> createSale( 
 			@Valid @RequestBody CreateSaleRequest request,
 			@RequestHeader(value = "X-User-Id", required = false) String headerUserId,
 			@RequestHeader(value = "X-User-Role", required = false) String headerUserRole,

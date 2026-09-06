@@ -38,7 +38,7 @@ public class SalesService {
 		this.projectRepo = projectRepo;
 		this.customerRepo = customerRepo;
 		this.customerService = customerService;
-		this.harvestRepo = harvestRepo;
+		this.harvestRepo = harvestRepo; 
 		this.userRepo = userRepo;
 	}
 	

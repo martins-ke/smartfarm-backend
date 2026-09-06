@@ -58,7 +58,7 @@ class SalesServiceTest {
 	private SalesService salesService;
 
 	private Project mockProject;
-
+ 
 	@BeforeEach
 	void setUp() {
 		mockProject = new Project();

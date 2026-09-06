@@ -81,7 +81,19 @@ public class SupplierService {
 		BigDecimal amountPaid = req.amountPaid() != null ? req.amountPaid() : BigDecimal.ZERO;
 
 		if (invoiceAmount.compareTo(BigDecimal.ZERO) <= 0) {
-			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Invoice amount must be greater than zero!", false, Instant.now()));
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Total invoice amount must be provided and greater than zero!", false, Instant.now()));
+		}
+
+		if (amountPaid.compareTo(BigDecimal.ZERO) < 0) {
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Amount paid cannot be negative!", false, Instant.now()));
+		}
+
+		if (amountPaid.compareTo(invoiceAmount) > 0) {
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Amount paid cannot exceed total invoice amount!", false, Instant.now()));
+		}
+
+		if (req.notes() == null || req.notes().trim().isEmpty()) {
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Delivery notes / item description must be provided for clarity!", false, Instant.now()));
 		}
 
 		BigDecimal balanceDue = invoiceAmount.subtract(amountPaid);
@@ -109,18 +121,22 @@ public class SupplierService {
 		long count = purchaseRepo.count();
 		String purId = "PUR-" + String.format("%03d", count + 1);
 
+		String invoiceNumber = (req.invoiceNumber() != null && !req.invoiceNumber().trim().isEmpty())
+				? req.invoiceNumber().trim()
+				: ("INV-" + purId);
+
 		SupplierPurchase purchase = new SupplierPurchase(
 			purId,
 			supplier,
 			item,
-			req.invoiceNumber() != null ? req.invoiceNumber().trim() : ("INV-" + purId),
+			invoiceNumber,
 			invoiceAmount,
 			amountPaid,
 			balanceDue,
 			status,
 			req.purchaseDate() != null ? req.purchaseDate() : LocalDate.now(),
 			req.dueDate(),
-			req.notes()
+			req.notes().trim()
 		);
 
 		SupplierPurchase saved = purchaseRepo.save(purchase);

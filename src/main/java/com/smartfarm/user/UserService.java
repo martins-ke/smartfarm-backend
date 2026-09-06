@@ -456,27 +456,56 @@ public class UserService {
 
 	@Transactional
 	public ResponseEntity<ApiResponse<User>> updatePrivileges(String id, UpdatePrivilegesRequest request, String callerUserId, String callerUserRole) {
-		if (!"ADMIN".equalsIgnoreCase(callerUserRole)) {
-			if (callerUserId != null && !callerUserId.trim().isEmpty()) {
-				User caller = userRepo.findById(callerUserId.trim()).orElse(null);
-				if (caller == null || !"ADMIN".equalsIgnoreCase(caller.getRole())) {
-					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Only Administrators can update user privileges.", false, Instant.now()));
-				}
+		User targetUser = userRepo.findById(id)
+			.orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
+
+		boolean isAdmin = "ADMIN".equalsIgnoreCase(callerUserRole);
+		boolean isManager = "MANAGER".equalsIgnoreCase(callerUserRole);
+
+		if (callerUserId != null && !callerUserId.trim().isEmpty()) {
+			User caller = userRepo.findById(callerUserId.trim()).orElse(null);
+			if (caller != null) {
+				if ("ADMIN".equalsIgnoreCase(caller.getRole())) isAdmin = true;
+				if ("MANAGER".equalsIgnoreCase(caller.getRole())) isManager = true;
 			}
 		}
 
-		User user = userRepo.findById(id)
-			.orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
+		if (!isAdmin) {
+			if (isManager) {
+				if (!"SUPERVISOR".equalsIgnoreCase(targetUser.getRole())) {
+					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Managers can only assign privileges to Supervisors.", false, Instant.now()));
+				}
+				if (callerUserId != null && targetUser.getManagerId() != null 
+						&& !callerUserId.trim().equalsIgnoreCase(targetUser.getManagerId().trim())
+						&& !callerUserId.trim().equalsIgnoreCase(targetUser.getCreatedById())) {
+					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You can only manage privileges for your assigned Supervisors.", false, Instant.now()));
+				}
+			} else {
+				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Only Administrators and Managers can update privileges.", false, Instant.now()));
+			}
+		}
 
 		if (request.privileges() != null) {
-			user.setPrivileges(request.privileges());
-		}
-		if (request.maxProjectCapacity() != null && request.maxProjectCapacity() > 0) {
-			user.setMaxProjectCapacity(request.maxProjectCapacity());
+			if (!isAdmin) {
+				// Sanitize to only permit supervisor-level privileges
+				Set<String> safeSupervisorPrivileges = new HashSet<>();
+				for (String priv : request.privileges()) {
+					if (priv != null && (priv.startsWith("CAN_RECORD_") || priv.startsWith("CAN_LOG_") || priv.startsWith("CAN_USE_"))) {
+						safeSupervisorPrivileges.add(priv.trim().toUpperCase());
+					}
+				}
+				targetUser.setPrivileges(safeSupervisorPrivileges);
+			} else {
+				targetUser.setPrivileges(request.privileges());
+			}
 		}
 
-		User saved = userRepo.save(user);
-		return ResponseEntity.ok(new ApiResponse<>(saved, "Privileges updated successfully for " + user.getUsername(), true, Instant.now()));
+		if (request.maxProjectCapacity() != null && request.maxProjectCapacity() > 0) {
+			targetUser.setMaxProjectCapacity(request.maxProjectCapacity());
+		}
+
+		User saved = userRepo.save(targetUser);
+		return ResponseEntity.ok(new ApiResponse<>(saved, "Privileges updated successfully for " + targetUser.getUsername(), true, Instant.now()));
 	}
 
 	public ResponseEntity<ApiResponse<User>> updatePrivileges(String id, UpdatePrivilegesRequest request) {
