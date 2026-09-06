@@ -31,7 +31,7 @@ public class SupplierController {
 
 	@GetMapping("/{id}")
 	public ResponseEntity<ApiResponse<Supplier>> getSupplierById(@PathVariable String id) {
-		return supplierService.getSupplierById(id);
+		return supplierService.getSupplierById(id); 
 	}
 
 	@PostMapping

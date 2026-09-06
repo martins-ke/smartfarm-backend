@@ -44,7 +44,7 @@ class UserServiceTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private PasswordResetTokenRepository tokenRepo;
+    private PasswordResetTokenRepository tokenRepo; 
 
     @Mock
     private EmailService emailService;

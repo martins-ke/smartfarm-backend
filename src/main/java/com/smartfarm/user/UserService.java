@@ -49,7 +49,7 @@ public class UserService {
 		this.passwordEncoder = passwordEncoder;
 		this.tokenRepo = tokenRepo;
 		this.emailService = emailService;
-	}
+	} 
 
 	public ResponseEntity<ApiResponse<BootstrapStatusResponse>> checkBootstrap() {
 		long total = userRepo.count();

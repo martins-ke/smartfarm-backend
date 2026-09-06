@@ -38,7 +38,7 @@ public class SupplierService {
 		Supplier supplier = supplierRepo.findById(id)
 				.orElseThrow(() -> new EntityNotFoundException("Supplier not found with ID: " + id));
 		return ResponseEntity.ok(new ApiResponse<>(supplier, "Supplier retrieved successfully ✅", true, Instant.now()));
-	}
+	} 
 
 	public ResponseEntity<ApiResponse<List<SupplierPurchase>>> getSupplierPurchases(String supplierId) {
 		List<SupplierPurchase> list = purchaseRepo.findBySupplierIdOrderByPurchaseDateDesc(supplierId);

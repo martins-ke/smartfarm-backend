@@ -42,7 +42,7 @@ public class UserController {
 	
 	@PostMapping("/login")
 	public ResponseEntity<ApiResponse<?>> login(@Valid @RequestBody LoginRequest request) {	
-		return service.login(request); 
+		return service.login(request);  
 	}
 
 	@PostMapping("/forgot-password")
