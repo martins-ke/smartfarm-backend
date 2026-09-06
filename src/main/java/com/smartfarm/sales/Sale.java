@@ -30,7 +30,9 @@ public class Sale {
 	@Column(nullable = false)
 	private BigDecimal unit_price;
 	@CreationTimestamp
-	private LocalDate added_on;
+	@Column(name = "added_on")
+	@JsonProperty("added_on")
+	private LocalDate addedOn;
 	private BigDecimal total_amount;
 
 	private BigDecimal amountPaid;
@@ -56,7 +58,7 @@ public class Sale {
 		this.quantity = quantity;
 		this.unit_price = unit_price;
 		this.customer = customer;
-		this.added_on = added_on;
+		this.addedOn = added_on;
 		this.total_amount = total_amount;
 		this.amountPaid = total_amount;
 		this.balanceDue = BigDecimal.ZERO;
@@ -72,7 +74,7 @@ public class Sale {
 		this.item = item;
 		this.quantity = quantity;
 		this.unit_price = unit_price;
-		this.added_on = added_on;
+		this.addedOn = added_on;
 		this.total_amount = total_amount;
 		this.amountPaid = amountPaid != null ? amountPaid : total_amount;
 		this.balanceDue = balanceDue != null ? balanceDue : BigDecimal.ZERO;
@@ -122,12 +124,21 @@ public class Sale {
 		this.customer = customer;
 	}
 
+	public LocalDate getAddedOn() {
+		return addedOn;
+	}
+
+	public void setAddedOn(LocalDate addedOn) {
+		this.addedOn = addedOn;
+	}
+
+	@JsonProperty("added_on")
 	public LocalDate getAdded_on() {
-		return added_on;
+		return addedOn;
 	}
 
 	public void setAdded_on(LocalDate added_on) {
-		this.added_on = added_on;
+		this.addedOn = added_on;
 	}
 
 	public BigDecimal getTotal_amount() {
@@ -181,5 +192,15 @@ public class Sale {
 	@JsonProperty("project_id")
 	public String getProjectId() {
 		return project != null ? project.getId() : null;
+	}
+
+	@JsonProperty("projectName")
+	public String getProjectName() {
+		return project != null ? project.getName() : null;
+	}
+
+	@JsonProperty("categoryName")
+	public String getCategoryName() {
+		return project != null && project.getCategory() != null ? project.getCategory().getName() : null;
 	}
 }

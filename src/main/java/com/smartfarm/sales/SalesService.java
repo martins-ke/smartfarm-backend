@@ -218,7 +218,7 @@ public class SalesService {
 				return ResponseEntity.status(200).body(new ApiResponse<>(org.springframework.data.domain.Page.empty(), "Financial privileges required to view sales.", true, Instant.now()));
 			}
 		}
-		Pageable pageable = PageRequest.of(page, size, Sort.by("added_on").descending());
+		Pageable pageable = PageRequest.of(page, size, Sort.by("addedOn").descending());
 		return ResponseEntity.status(200).body(new ApiResponse<>(salesRepo.findAll(pageable), "Sales fetched successfully", true, Instant.now()));
 	}
 
@@ -236,12 +236,18 @@ public class SalesService {
 				return ResponseEntity.status(200).body(new ApiResponse<>(org.springframework.data.domain.Page.empty(), "Financial privileges required to view sales.", true, Instant.now()));
 			}
 		}
-		Pageable pageable = PageRequest.of(page, size, Sort.by("added_on").descending());
+		Pageable pageable = PageRequest.of(page, size, Sort.by("addedOn").descending());
 		return ResponseEntity.status(200).body(new ApiResponse<>(salesRepo.findByProjectId(projectId, pageable), "Sales retrieved successfully", true, Instant.now()));
 	}
 
 	public ResponseEntity<ApiResponse<Page<Sale>>> getSalesByProjectId(String projectId, int page, int size) {
 		return getSalesByProjectId(projectId, page, size, null, null);
+	}
+
+	public ResponseEntity<ApiResponse<Page<Sale>>> getSalesByCustomerId(String customerId, int page, int size) {
+		Pageable pageable = PageRequest.of(page, size, Sort.by("addedOn").descending().and(Sort.by("id").descending()));
+		Page<Sale> salesPage = salesRepo.findByCustomerId(customerId, pageable);
+		return ResponseEntity.status(200).body(new ApiResponse<>(salesPage, "Customer purchase history retrieved successfully", true, Instant.now()));
 	}
 
 	public ResponseEntity<ApiResponse<Sale>> getSaleById(String id) {

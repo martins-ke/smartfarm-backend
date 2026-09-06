@@ -75,6 +75,14 @@ public class SalesController {
 		return salesService.getSalesByProjectId(projectId, page, size);
 	}
 
+	@GetMapping("/customer/{customerId}")
+	public ResponseEntity<ApiResponse<Page<Sale>>> getSalesByCustomerId(
+			@PathVariable String customerId,
+			@RequestParam(defaultValue = "0") int page,
+			@RequestParam(defaultValue = "10") int size) {
+		return salesService.getSalesByCustomerId(customerId, page, size);
+	}
+
 	@GetMapping("/{id}")
 	public ResponseEntity<ApiResponse<Sale>> getSaleById(@PathVariable String id) {
 		return salesService.getSaleById(id);

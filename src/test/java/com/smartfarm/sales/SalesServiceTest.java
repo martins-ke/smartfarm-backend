@@ -212,7 +212,7 @@ class SalesServiceTest {
 	void getSalesByProjectId_returnsList() {
 		Sale s1 = new Sale("S001", "Milk", 10, new BigDecimal("70"), null, new BigDecimal("700"), mockProject, null);
 		org.springframework.data.domain.Page<Sale> page = new org.springframework.data.domain.PageImpl<>(List.of(s1));
-		when(salesRepo.findByProjectId("P001", org.springframework.data.domain.PageRequest.of(0, 10, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "added_on")))).thenReturn(page);
+		when(salesRepo.findByProjectId("P001", org.springframework.data.domain.PageRequest.of(0, 10, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "addedOn")))).thenReturn(page);
 
 		ResponseEntity<ApiResponse<org.springframework.data.domain.Page<Sale>>> response = salesService.getSalesByProjectId("P001", 0, 10);
 		assertEquals(HttpStatus.OK, response.getStatusCode());

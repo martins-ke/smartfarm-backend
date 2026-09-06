@@ -15,6 +15,7 @@ public interface SalesRepository extends JpaRepository<Sale, String> {
 	Page<Sale> findAll(Pageable pageable);
 	Page<Sale> findByProjectId(String projectId, Pageable pageable);
 	List<Sale> findByCustomerId(String customerId);
+	Page<Sale> findByCustomerId(String customerId, Pageable pageable);
 
 	@Query("SELECT COALESCE(SUM(s.total_amount), 0) FROM Sale s WHERE s.project.id = :projectId")
 	BigDecimal totalSalesByProjectId(@Param("projectId") String projectId);
