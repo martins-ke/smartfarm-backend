@@ -1,5 +1,6 @@
 package com.smartfarm.user;
 
+import java.time.Instant;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
@@ -33,6 +34,11 @@ public class UserController {
 	@GetMapping("/check-bootstrap")
 	public ResponseEntity<ApiResponse<BootstrapStatusResponse>> checkBootstrap() {
 		return service.checkBootstrap();
+	}
+
+	@GetMapping("/login")
+	public ResponseEntity<ApiResponse<?>> getLoginHelp() {
+		return ResponseEntity.ok(new ApiResponse<>(null, "SmartFarm Login API is online. Send a POST request with JSON { username, password } to authenticate.", true, Instant.now()));
 	}
 
 	@PostMapping("/signup")

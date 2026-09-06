@@ -266,12 +266,20 @@ public class UserService {
 		} else {
 			users = userRepo.findAll();
 		}
+		for (User u : users) {
+			if ("SUPERVISOR".equalsIgnoreCase(u.getRole())) {
+				u.setAssignedProjectsCount(projectRepo.findBySupervisorId(u.getId()).size());
+			}
+		}
 		return ResponseEntity.ok(new ApiResponse<>(users, "Users fetched successfully", true, Instant.now()));
 	}
 
 	public ResponseEntity<ApiResponse<User>> getUserById(String id) {
 		User user = userRepo.findById(id)
 			.orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
+		if ("SUPERVISOR".equalsIgnoreCase(user.getRole())) {
+			user.setAssignedProjectsCount(projectRepo.findBySupervisorId(user.getId()).size());
+		}
 		return ResponseEntity.ok(new ApiResponse<>(user, "User details fetched successfully", true, Instant.now()));
 	}
 

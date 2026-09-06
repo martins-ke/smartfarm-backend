@@ -14,6 +14,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 @Entity
 @Table(name = "users")
@@ -34,6 +35,9 @@ public class User {
 	private String createdById; // Tracks which Admin/Manager created this user
 	private String managerId; // Tracks parent Manager for dedicated 1:N supervisors
 	private int maxProjectCapacity = 4; // Default max project capacity for supervisors
+
+	@Transient
+	private Integer assignedProjectsCount;
 
 	@ManyToMany(fetch = FetchType.EAGER)
 	@JoinTable(
@@ -164,5 +168,11 @@ public class User {
 		} else {
 			this.privilegesRaw = String.join(",", privileges);
 		}
+	}
+	public Integer getAssignedProjectsCount() {
+		return assignedProjectsCount;
+	}
+	public void setAssignedProjectsCount(Integer assignedProjectsCount) {
+		this.assignedProjectsCount = assignedProjectsCount;
 	}
 }
