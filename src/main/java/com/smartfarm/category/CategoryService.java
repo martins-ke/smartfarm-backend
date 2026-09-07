@@ -111,6 +111,7 @@ public class CategoryService {
 	}
 
 	public ResponseEntity<ApiResponse<Void>> deleteCategory(String id, String userId, String userRole) {
+		
 		if (!"ADMIN".equalsIgnoreCase(userRole)) {
 			if (userId != null && !userId.trim().isEmpty()) {
 				com.smartfarm.user.User caller = userRepo.findById(userId.trim()).orElse(null);

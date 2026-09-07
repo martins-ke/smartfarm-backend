@@ -493,6 +493,11 @@ public class UserService {
 						&& !callerUserId.trim().equalsIgnoreCase(targetUser.getCreatedById())) {
 					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You can only manage privileges for your assigned Supervisors.", false, Instant.now()));
 				}
+				
+				User caller = userRepo.findById(callerUserId).orElse(null);
+				if (caller != null && (caller.getPrivileges() == null || !caller.getPrivileges().contains("CAN_ASSIGN_PRIVILEGES"))) {
+					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You do not have the privilege to assign or toggle supervisor privileges.", false, Instant.now()));
+				}
 			} else {
 				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Only Administrators and Managers can update privileges.", false, Instant.now()));
 			}

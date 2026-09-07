@@ -154,6 +154,7 @@ public class User {
 		// Only fall back to defaults if privilegesRaw has NEVER been set (is null)
 		if ("MANAGER".equalsIgnoreCase(this.role)) {
 			result.add("CAN_CREATE_SUPERVISORS");
+			result.add("CAN_ASSIGN_PRIVILEGES");
 			result.add("CAN_VIEW_FINANCIALS");
 		} else if ("SUPERVISOR".equalsIgnoreCase(this.role)) {
 			result.add("CAN_RECORD_HARVEST");
