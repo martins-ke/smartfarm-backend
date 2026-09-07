@@ -1,8 +1,5 @@
 # SmartFarm Security & Authentication (JWT Migration)
 
-**Status:** In Progress
-**Scope:** Backend Authentication & Route Protection
-
 ## 1. Current State (Header-Based Authentication)
 
 Currently, the system relies on client-side state combined with raw headers to identify users. 

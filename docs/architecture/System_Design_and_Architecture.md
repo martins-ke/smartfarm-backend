@@ -1,10 +1,5 @@
 # System Design & Architecture Document (SDD)
 ## SmartFarm Management Application
-**Document Version:** 2.0  
-**SDLC Stage:** Phase 2 — System Architecture, ERD & Module Design  
-**Status:** Approved Technical Blueprint  
-
----
 
 ## 1. Architectural Overview & Technology Stack
 

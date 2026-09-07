@@ -1,9 +1,4 @@
 # SmartFarm Complete System Flowcharts Specification
-**Document Version:** 2.0  
-**SDLC Stage:** Phase 2 — System Architecture & Complete Workflow Flowcharts  
-**Status:** Approved Reference  
-
----
 
 ## 1. User Authentication, Login & Multi-Method Password Recovery Flow
 

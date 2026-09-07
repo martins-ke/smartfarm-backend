@@ -1,10 +1,5 @@
 # Software Requirements Specification (SRS)
 ## SmartFarm Management Application
-**Document Version:** 2.0  
-**SDLC Stage:** Phase 1 — Requirements Specification & Compliance Expansion  
-**Status:** Approved Baseline  
-
----
 
 ## 1. Introduction
 
