@@ -101,7 +101,23 @@ public class UserService {
 				: "MANAGER";
 
 			if ("ADMIN".equalsIgnoreCase(requestedRole)) {
-				return ResponseEntity.status(400).body(new ApiResponse<>(null, "Only 1 Administrator account is permitted on the farm portal.", false, Instant.now()));
+				if (adminCount >= 2) {
+					return ResponseEntity.status(400).body(new ApiResponse<>(null, "Maximum of 2 Administrator accounts are permitted on the farm portal.", false, Instant.now()));
+				}
+				assignedRole = "ADMIN";
+				assignedStatus = "ACTIVE";
+				successMessage = "Administrator account created successfully ✅";
+				String email2 = (request.email() != null && !request.email().trim().isEmpty()) ? request.email().trim() : null;
+				if (email2 != null && userRepo.findByEmail(email2).isPresent()) {
+					return ResponseEntity.status(400).body(new ApiResponse<>(null, "Email already registered! Try a different email.", false, Instant.now()));
+				}
+				long count2 = userRepo.count();
+				String id2 = IdGenarator.generateId(username, count2);
+				while (userRepo.existsById(id2)) { count2++; id2 = IdGenarator.generateId(username, count2); }
+				String hashedPw = passwordEncoder.encode(password);
+				User adminUser = new User(id2, username, email2, hashedPw, "ADMIN", "ACTIVE", null);
+				User savedAdmin = userRepo.save(adminUser);
+				return ResponseEntity.status(201).body(new ApiResponse<>(savedAdmin, successMessage, true, Instant.now()));
 			}
 
 			if ("MANAGER".equalsIgnoreCase(requestedRole)) {
