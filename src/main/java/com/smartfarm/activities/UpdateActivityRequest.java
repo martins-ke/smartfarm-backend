@@ -1,5 +1,7 @@
 package com.smartfarm.activities;
 
+import java.time.LocalDate;
+
 import jakarta.validation.constraints.NotBlank;
 
 public record UpdateActivityRequest(
@@ -7,5 +9,9 @@ public record UpdateActivityRequest(
 		String title,
 		@NotBlank(message = "Activity type required!") 
 		String type,
-		String notes
+		String notes,
+		LocalDate scheduledDate,
+		LocalDate dueDate,
+		String status,
+		String priority
 ) {}

@@ -118,7 +118,7 @@ class UserServiceTest {
     @Test
     void updatePrivileges_whenCallerIsManagerAndTargetIsSupervisor_succeeds() {
         User manager = new User("MGR001", "manager1", "mgr@farm.com", "pass", "MANAGER", "ACTIVE", "ADMIN01");
-        supervisor.setManagerId("MGR001");
+        supervisor.setCreatedById("MGR001");
 
         when(userRepo.findById("SUP002")).thenReturn(Optional.of(supervisor));
         when(userRepo.findById("MGR001")).thenReturn(Optional.of(manager));

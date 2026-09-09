@@ -39,6 +39,11 @@ public class SupplierController {
 		return supplierService.createSupplier(request);
 	}
 
+	@GetMapping("/purchases")
+	public ResponseEntity<ApiResponse<List<SupplierPurchase>>> getAllPurchases() {
+		return supplierService.getAllPurchases();
+	}
+
 	@GetMapping("/{id}/purchases")
 	public ResponseEntity<ApiResponse<List<SupplierPurchase>>> getSupplierPurchases(@PathVariable String id) {
 		return supplierService.getSupplierPurchases(id);

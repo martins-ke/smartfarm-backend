@@ -96,9 +96,15 @@ public class ActivityService {
 			count++;
 			id = IdGenarator.generateId(request.title(), count);
 		} 
-		Activity activity = new Activity(id, request.title(), request.type(),LocalDate.now(), request.notes(), project);
+
+		LocalDate schedDate = request.scheduledDate() != null ? request.scheduledDate() : LocalDate.now();
+		String status = (request.status() != null && !request.status().trim().isEmpty()) ? request.status().trim().toUpperCase() : "SCHEDULED";
+		String priority = (request.priority() != null && !request.priority().trim().isEmpty()) ? request.priority().trim().toUpperCase() : "MEDIUM";
+
+		Activity activity = new Activity(id, request.title(), request.type(), LocalDate.now(), request.notes(),
+				schedDate, request.dueDate(), status, priority, project);
 		
-		return ResponseEntity.status(201).body(new ApiResponse<>(activityRepo.save(activity), "Activity recorded successfully ✅", true, Instant.now())); 
+		return ResponseEntity.status(201).body(new ApiResponse<>(activityRepo.save(activity), "Activity scheduled/recorded successfully ✅", true, Instant.now())); 
 	} 
 
 	public ResponseEntity<ApiResponse<Activity>> recordActivity(CreateActivityRequest request) {
@@ -118,6 +124,21 @@ public class ActivityService {
 		if (request.notes() != null) {
 			activity.setNotes(request.notes().trim());
 		}
+		if (request.scheduledDate() != null) {
+			activity.setScheduledDate(request.scheduledDate());
+		}
+		if (request.dueDate() != null) {
+			activity.setDueDate(request.dueDate());
+		}
+		if (request.status() != null && !request.status().trim().isEmpty()) {
+			activity.setStatus(request.status().trim().toUpperCase());
+			if ("COMPLETED".equalsIgnoreCase(request.status().trim())) {
+				activity.setCompletedOn(LocalDate.now());
+			}
+		}
+		if (request.priority() != null && !request.priority().trim().isEmpty()) {
+			activity.setPriority(request.priority().trim().toUpperCase());
+		}
 
 		Activity saved = activityRepo.save(activity);
 		return ResponseEntity.ok(new ApiResponse<>(saved, "Activity updated successfully ✅", true, Instant.now()));
@@ -125,6 +146,20 @@ public class ActivityService {
 
 	public ResponseEntity<ApiResponse<Activity>> updateActivity(String id, UpdateActivityRequest request) {
 		return updateActivity(id, request, null, null);
+	}
+
+	public ResponseEntity<ApiResponse<Activity>> updateActivityStatus(String id, String status) {
+		Activity activity = activityRepo.findById(id)
+				.orElseThrow(() -> new EntityNotFoundException("Activity not found with ID: " + id));
+
+		String newStatus = (status != null && !status.trim().isEmpty()) ? status.trim().toUpperCase() : "COMPLETED";
+		activity.setStatus(newStatus);
+		if ("COMPLETED".equalsIgnoreCase(newStatus)) {
+			activity.setCompletedOn(LocalDate.now());
+		}
+
+		Activity saved = activityRepo.save(activity);
+		return ResponseEntity.ok(new ApiResponse<>(saved, "Activity status updated to " + newStatus + " ✅", true, Instant.now()));
 	}
 
 	public ResponseEntity<ApiResponse<Void>> deleteActivity(String id, String userId, String userRole) {

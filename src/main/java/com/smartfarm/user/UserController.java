@@ -77,9 +77,8 @@ public class UserController {
 	@GetMapping
 	public ResponseEntity<ApiResponse<List<User>>> getAllUsers(
 			@RequestParam(required = false) String role,
-			@RequestParam(required = false) String createdById,
-			@RequestParam(required = false) String managerId) {
-		return service.getAllUsers(role, createdById, managerId);
+			@RequestParam(required = false) String createdById) {
+		return service.getAllUsers(role, createdById);
 	}
 
 	@GetMapping("/{id}")

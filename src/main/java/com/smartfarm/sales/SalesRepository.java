@@ -13,6 +13,8 @@ public interface SalesRepository extends JpaRepository<Sale, String> {
 
 	List<Sale> findByProjectId(String projectId);
 	Page<Sale> findAll(Pageable pageable);
+	List<Sale> findAllByOrderByAddedOnDesc();
+	List<Sale> findTop10ByOrderByAddedOnDesc();
 	Page<Sale> findByProjectId(String projectId, Pageable pageable);
 	List<Sale> findByCustomerId(String customerId);
 	Page<Sale> findByCustomerId(String customerId, Pageable pageable);

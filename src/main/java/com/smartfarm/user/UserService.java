@@ -271,11 +271,9 @@ public class UserService {
 		return adminResetPassword(userId, request, null, null);
 	}
 
-	public ResponseEntity<ApiResponse<List<User>>> getAllUsers(String role, String createdById, String managerId) {
+	public ResponseEntity<ApiResponse<List<User>>> getAllUsers(String role, String createdById) {
 		List<User> users;
-		if (managerId != null && !managerId.trim().isEmpty()) {
-			users = userRepo.findByManagerId(managerId.trim());
-		} else if (createdById != null && !createdById.trim().isEmpty()) {
+		if (createdById != null && !createdById.trim().isEmpty()) {
 			users = userRepo.findByCreatedById(createdById.trim());
 		} else if (role != null && !role.trim().isEmpty()) {
 			users = userRepo.findByRoleIgnoreCase(role.trim());
@@ -362,18 +360,6 @@ public class UserService {
 		String hashedPassword = passwordEncoder.encode(password);
 		String creatorId = request.createdById() != null ? request.createdById() : (caller != null ? caller.getId() : null);
 		User user = new User(id, username, email, hashedPassword, role, "ACTIVE", creatorId);
-
-		if ("SUPERVISOR".equalsIgnoreCase(role)) {
-			if (caller != null && "MANAGER".equalsIgnoreCase(caller.getRole())) {
-				user.setManagerId(caller.getId());
-			} else if (creatorId != null) {
-				userRepo.findById(creatorId).ifPresent(c -> {
-					if ("MANAGER".equalsIgnoreCase(c.getRole())) {
-						user.setManagerId(c.getId());
-					}
-				});
-			}
-		}
 		User saved = userRepo.save(user);
 
 		return ResponseEntity.status(201).body(new ApiResponse<>(saved, role + " created and activated successfully.", true, Instant.now()));
@@ -504,9 +490,8 @@ public class UserService {
 				if (!"SUPERVISOR".equalsIgnoreCase(targetUser.getRole())) {
 					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Managers can only assign privileges to Supervisors.", false, Instant.now()));
 				}
-				if (callerUserId != null && targetUser.getManagerId() != null 
-						&& !callerUserId.trim().equalsIgnoreCase(targetUser.getManagerId().trim())
-						&& !callerUserId.trim().equalsIgnoreCase(targetUser.getCreatedById())) {
+				if (callerUserId != null && targetUser.getCreatedById() != null 
+						&& !callerUserId.trim().equalsIgnoreCase(targetUser.getCreatedById().trim())) {
 					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You can only manage privileges for your assigned Supervisors.", false, Instant.now()));
 				}
 				

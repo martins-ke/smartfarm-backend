@@ -45,6 +45,11 @@ public class SupplierService {
 		return ResponseEntity.ok(new ApiResponse<>(list, "Supplier purchases retrieved ✅", true, Instant.now()));
 	}
 
+	public ResponseEntity<ApiResponse<List<SupplierPurchase>>> getAllPurchases() {
+		List<SupplierPurchase> list = purchaseRepo.findAllByOrderByPurchaseDateDesc();
+		return ResponseEntity.ok(new ApiResponse<>(list, "All supplier purchases retrieved ✅", true, Instant.now()));
+	}
+
 	@Transactional
 	public ResponseEntity<ApiResponse<?>> createSupplier(CreateSupplierRequest req) {
 		if (req.name() == null || req.name().trim().isEmpty()) {

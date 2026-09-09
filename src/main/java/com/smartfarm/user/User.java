@@ -33,7 +33,6 @@ public class User {
 	@Column(nullable = false)
 	private String status; // "ACTIVE", "PENDING_APPROVAL", "DISABLED"
 	private String createdById; // Tracks which Admin/Manager created this user
-	private String managerId; // Tracks parent Manager for dedicated 1:N supervisors
 	private int maxProjectCapacity = 4; // Default max project capacity for supervisors
 
 	@Transient
@@ -124,12 +123,6 @@ public class User {
 	}
 	public void setAssignedCategories(Set<Category> assignedCategories) {
 		this.assignedCategories = assignedCategories;
-	}
-	public String getManagerId() {
-		return managerId;
-	}
-	public void setManagerId(String managerId) {
-		this.managerId = managerId;
 	}
 	public int getMaxProjectCapacity() {
 		return maxProjectCapacity <= 0 ? 4 : maxProjectCapacity;

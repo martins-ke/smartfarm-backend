@@ -44,6 +44,13 @@ public class ActivityController {
 		return activityService.updateActivity(id, request, effectiveUserId, effectiveUserRole);
 	}
 
+	@org.springframework.web.bind.annotation.PatchMapping("/{id}/status")
+	public ResponseEntity<ApiResponse<Activity>> updateStatus(
+			@org.springframework.web.bind.annotation.PathVariable String id,
+			@org.springframework.web.bind.annotation.RequestParam(required = false, defaultValue = "COMPLETED") String status) {
+		return activityService.updateActivityStatus(id, status);
+	}
+
 	@org.springframework.web.bind.annotation.GetMapping("/{id}/labor")
 	public ResponseEntity<ApiResponse<java.util.List<ActivityLaborAssignment>>> getLaborAssignments(@org.springframework.web.bind.annotation.PathVariable String id) {
 		return activityService.getLaborAssignments(id);
