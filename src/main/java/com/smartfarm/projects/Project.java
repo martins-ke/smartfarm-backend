@@ -46,9 +46,11 @@ public class Project {
 	private com.smartfarm.user.User supervisor;
 	
 	@OneToMany(mappedBy = "project")
+	@com.fasterxml.jackson.annotation.JsonIgnore
 	private List<Expense> expenses;
 	
 	@OneToMany(mappedBy = "project")
+	@com.fasterxml.jackson.annotation.JsonIgnore
 	private List<Sale> sales;
 	
 	public Project() {}
@@ -131,6 +133,7 @@ public class Project {
 	public void setSupervisor(com.smartfarm.user.User supervisor) {
 		this.supervisor = supervisor;
 	}
+	@com.fasterxml.jackson.annotation.JsonIgnore
 	public List<Expense> getExpenses() {
 		return expenses;
 	}

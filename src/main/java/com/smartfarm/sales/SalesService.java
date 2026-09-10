@@ -30,14 +30,16 @@ public class SalesService {
 	private final ProjectRepository projectRepo;
 	private final CustomerRepository customerRepo;
 	private final CustomerService customerService;
+	private final com.smartfarm.customers.CustomerPaymentRepository customerPaymentRepo;
 	private final HarvestRepository harvestRepo;
 	private final com.smartfarm.user.UserRepository userRepo;
 	
-	public SalesService(SalesRepository salesRepo, ProjectRepository projectRepo, CustomerRepository customerRepo, CustomerService customerService, HarvestRepository harvestRepo, com.smartfarm.user.UserRepository userRepo) {
+	public SalesService(SalesRepository salesRepo, ProjectRepository projectRepo, CustomerRepository customerRepo, CustomerService customerService, com.smartfarm.customers.CustomerPaymentRepository customerPaymentRepo, HarvestRepository harvestRepo, com.smartfarm.user.UserRepository userRepo) {
 		this.salesRepo = salesRepo;
 		this.projectRepo = projectRepo;
 		this.customerRepo = customerRepo;
 		this.customerService = customerService;
+		this.customerPaymentRepo = customerPaymentRepo;
 		this.harvestRepo = harvestRepo; 
 		this.userRepo = userRepo;
 	}
@@ -201,7 +203,31 @@ public class SalesService {
 		}
 		
 		Sale sale = new Sale(id, request.item(), request.quantity(), request.unit_price(), LocalDate.now(), total_amount, amountPaid, balanceDue, paymentMode, paymentStatus, project, customer);
-		return ResponseEntity.status(201).body(new ApiResponse<>(salesRepo.save(sale), "Sale recorded & customer ledger updated successfully ✅", true, Instant.now()));  
+		Sale savedSale = salesRepo.save(sale);
+
+		if (customer != null && amountPaid.compareTo(BigDecimal.ZERO) > 0) {
+			long payCount = customerPaymentRepo.count();
+			String payId = "PAY-CUST-" + String.format("%04d", payCount + 1);
+			while (customerPaymentRepo.existsById(payId)) {
+				payCount++;
+				payId = "PAY-CUST-" + String.format("%04d", payCount + 1);
+			}
+
+			com.smartfarm.customers.CustomerPayment initialPayment = new com.smartfarm.customers.CustomerPayment(
+				payId,
+				customer,
+				savedSale,
+				amountPaid,
+				paymentMode != null ? paymentMode : "CASH",
+				"INV-" + savedSale.getId(),
+				LocalDate.now(),
+				"Initial deposit recorded upon checkout (" + request.item() + ")",
+				customer.getOutstandingDebt()
+			);
+			customerPaymentRepo.save(initialPayment);
+		}
+
+		return ResponseEntity.status(201).body(new ApiResponse<>(savedSale, "Sale recorded & customer ledger updated successfully ✅", true, Instant.now()));  
 	}
 
 	public ResponseEntity<ApiResponse<Sale>> createSale(CreateSaleRequest request) {

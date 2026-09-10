@@ -20,12 +20,14 @@ public class SupplierService {
 
 	private final SupplierRepository supplierRepo;
 	private final SupplierPurchaseRepository purchaseRepo;
+	private final SupplierPaymentRepository paymentRepo;
 	private final InventoryItemRepository inventoryRepo;
 
 	public SupplierService(SupplierRepository supplierRepo, SupplierPurchaseRepository purchaseRepo,
-			InventoryItemRepository inventoryRepo) {
+			SupplierPaymentRepository paymentRepo, InventoryItemRepository inventoryRepo) {
 		this.supplierRepo = supplierRepo;
 		this.purchaseRepo = purchaseRepo;
+		this.paymentRepo = paymentRepo;
 		this.inventoryRepo = inventoryRepo;
 	}
 
@@ -48,6 +50,16 @@ public class SupplierService {
 	public ResponseEntity<ApiResponse<List<SupplierPurchase>>> getAllPurchases() {
 		List<SupplierPurchase> list = purchaseRepo.findAllByOrderByPurchaseDateDesc();
 		return ResponseEntity.ok(new ApiResponse<>(list, "All supplier purchases retrieved ✅", true, Instant.now()));
+	}
+
+	public ResponseEntity<ApiResponse<List<SupplierPayment>>> getSupplierPayments(String supplierId) {
+		List<SupplierPayment> list = paymentRepo.findBySupplierIdOrderByPaymentDateDescCreatedAtDesc(supplierId);
+		return ResponseEntity.ok(new ApiResponse<>(list, "Supplier payments retrieved ✅", true, Instant.now()));
+	}
+
+	public ResponseEntity<ApiResponse<List<SupplierPayment>>> getPurchasePayments(String purchaseId) {
+		List<SupplierPayment> list = paymentRepo.findByPurchaseIdOrderByPaymentDateDescCreatedAtDesc(purchaseId);
+		return ResponseEntity.ok(new ApiResponse<>(list, "Purchase payment history retrieved ✅", true, Instant.now()));
 	}
 
 	@Transactional
@@ -125,6 +137,10 @@ public class SupplierService {
 
 		long count = purchaseRepo.count();
 		String purId = "PUR-" + String.format("%03d", count + 1);
+		while (purchaseRepo.existsById(purId)) {
+			count++;
+			purId = "PUR-" + String.format("%03d", count + 1);
+		}
 
 		String invoiceNumber = (req.invoiceNumber() != null && !req.invoiceNumber().trim().isEmpty())
 				? req.invoiceNumber().trim()
@@ -152,6 +168,29 @@ public class SupplierService {
 		supplier.setBalanceOwed(supplier.getTotalBilled().subtract(supplier.getTotalPaid()));
 		supplierRepo.save(supplier);
 
+		// If an initial deposit was paid upon recording invoice, log the initial transaction
+		if (amountPaid.compareTo(BigDecimal.ZERO) > 0) {
+			long payCount = paymentRepo.count();
+			String payId = "PAY-SUP-" + String.format("%04d", payCount + 1);
+			while (paymentRepo.existsById(payId)) {
+				payCount++;
+				payId = "PAY-SUP-" + String.format("%04d", payCount + 1);
+			}
+
+			SupplierPayment initialPayment = new SupplierPayment(
+				payId,
+				supplier,
+				saved,
+				amountPaid,
+				"INITIAL_INVOICE_DOWNPAYMENT",
+				invoiceNumber,
+				req.purchaseDate() != null ? req.purchaseDate() : LocalDate.now(),
+				"Initial deposit recorded upon invoice registration (" + req.notes().trim() + ")",
+				balanceDue
+			);
+			paymentRepo.save(initialPayment);
+		}
+
 		return ResponseEntity.status(201).body(new ApiResponse<>(saved, "Supplier purchase recorded & stock updated ✅", true, Instant.now()));
 	}
 
@@ -172,6 +211,69 @@ public class SupplierService {
 		}
 		supplier.setBalanceOwed(newBalance);
 		Supplier updated = supplierRepo.save(supplier);
+
+		SupplierPurchase targetPurchase = null;
+		if (req.purchaseId() != null && !req.purchaseId().trim().isEmpty()) {
+			targetPurchase = purchaseRepo.findById(req.purchaseId().trim()).orElse(null);
+			if (targetPurchase != null) {
+				BigDecimal currentPaid = targetPurchase.getAmountPaid() != null ? targetPurchase.getAmountPaid() : BigDecimal.ZERO;
+				BigDecimal totalAmount = targetPurchase.getInvoiceAmount() != null ? targetPurchase.getInvoiceAmount() : BigDecimal.ZERO;
+				BigDecimal newPurchasePaid = currentPaid.add(payment);
+				if (newPurchasePaid.compareTo(totalAmount) > 0) {
+					newPurchasePaid = totalAmount;
+				}
+				targetPurchase.setAmountPaid(newPurchasePaid);
+				BigDecimal newDue = totalAmount.subtract(newPurchasePaid);
+				if (newDue.compareTo(BigDecimal.ZERO) < 0) newDue = BigDecimal.ZERO;
+				targetPurchase.setBalanceDue(newDue);
+				targetPurchase.setPaymentStatus(newDue.compareTo(BigDecimal.ZERO) == 0 ? "PAID" : "PARTIAL");
+				purchaseRepo.save(targetPurchase);
+			}
+		} else {
+			// FIFO allocation across unpaid purchase invoices
+			List<SupplierPurchase> purchases = purchaseRepo.findBySupplierIdOrderByPurchaseDateAsc(supplierId);
+			BigDecimal remainingToAllocate = payment;
+			for (SupplierPurchase p : purchases) {
+				BigDecimal due = p.getBalanceDue() != null ? p.getBalanceDue() : BigDecimal.ZERO;
+				if (due.compareTo(BigDecimal.ZERO) > 0) {
+					BigDecimal alloc = remainingToAllocate.min(due);
+					BigDecimal currentPaid = p.getAmountPaid() != null ? p.getAmountPaid() : BigDecimal.ZERO;
+					p.setAmountPaid(currentPaid.add(alloc));
+					BigDecimal newDue = due.subtract(alloc);
+					p.setBalanceDue(newDue);
+					p.setPaymentStatus(newDue.compareTo(BigDecimal.ZERO) == 0 ? "PAID" : "PARTIAL");
+					purchaseRepo.save(p);
+
+					remainingToAllocate = remainingToAllocate.subtract(alloc);
+					if (remainingToAllocate.compareTo(BigDecimal.ZERO) <= 0) break;
+				}
+			}
+		}
+
+		long payCount = paymentRepo.count();
+		String payId = "PAY-SUP-" + String.format("%04d", payCount + 1);
+		while (paymentRepo.existsById(payId)) {
+			payCount++;
+			payId = "PAY-SUP-" + String.format("%04d", payCount + 1);
+		}
+
+		String paymentMode = req.paymentMode() != null && !req.paymentMode().trim().isEmpty() 
+				? req.paymentMode().trim().toUpperCase() 
+				: "MPESA";
+		LocalDate pDate = req.paymentDate() != null ? req.paymentDate() : LocalDate.now();
+
+		SupplierPayment paymentRecord = new SupplierPayment(
+			payId,
+			supplier,
+			targetPurchase,
+			payment,
+			paymentMode,
+			req.referenceNumber(),
+			pDate,
+			req.notes(),
+			newBalance
+		);
+		paymentRepo.save(paymentRecord);
 
 		return ResponseEntity.ok(new ApiResponse<>(updated, "Supplier payment recorded. Remaining debt balance: KES " + newBalance + " ✅", true, Instant.now()));
 	}

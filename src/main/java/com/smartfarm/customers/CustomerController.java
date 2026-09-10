@@ -2,6 +2,7 @@ package com.smartfarm.customers;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -48,13 +49,44 @@ public class CustomerController {
 		return ResponseEntity.status(201).body(new ApiResponse<>(created, "Customer created successfully ✅", true, Instant.now()));
 	}
 
+	@GetMapping("/{id}/payments")
+	public ResponseEntity<ApiResponse<List<CustomerPayment>>> getCustomerPayments(@PathVariable String id) {
+		return customerService.getCustomerPayments(id);
+	}
+
+	@GetMapping("/sales/{saleId}/payments")
+	public ResponseEntity<ApiResponse<List<CustomerPayment>>> getSalePaymentsDirect(@PathVariable String saleId) {
+		return customerService.getSalePayments(saleId);
+	}
+
+	@GetMapping("/{id}/sales/{saleId}/payments")
+	public ResponseEntity<ApiResponse<List<CustomerPayment>>> getSalePayments(@PathVariable String id, @PathVariable String saleId) {
+		return customerService.getSalePayments(saleId);
+	}
+
 	@PostMapping("/{id}/payments")
 	public ResponseEntity<ApiResponse<?>> recordPayment(@PathVariable String id, @RequestBody Map<String, Object> body) {
 		Object amtObj = body != null ? body.get("amount") : null;
 		BigDecimal amount = BigDecimal.ZERO;
-		if (amtObj != null) {
-			amount = new BigDecimal(amtObj.toString());
+		if (amtObj != null && !amtObj.toString().trim().isEmpty()) {
+			amount = new BigDecimal(amtObj.toString().trim());
 		}
-		return customerService.settleCustomerDebt(id, amount);
+
+		String paymentMode = body != null && body.get("paymentMode") != null ? body.get("paymentMode").toString() : "CASH";
+		String referenceNumber = body != null && body.get("referenceNumber") != null ? body.get("referenceNumber").toString() : null;
+		String saleId = body != null && body.get("saleId") != null && !body.get("saleId").toString().trim().isEmpty() 
+				? body.get("saleId").toString().trim() 
+				: null;
+		String notes = body != null && body.get("notes") != null ? body.get("notes").toString() : null;
+		
+		LocalDate paymentDate = LocalDate.now();
+		if (body != null && body.get("paymentDate") != null && !body.get("paymentDate").toString().trim().isEmpty()) {
+			try {
+				paymentDate = LocalDate.parse(body.get("paymentDate").toString().trim());
+			} catch (Exception e) {}
+		}
+
+		CustomerPaymentRequest req = new CustomerPaymentRequest(amount, paymentMode, referenceNumber, saleId, notes, paymentDate);
+		return customerService.settleCustomerDebt(id, req);
 	}
 }

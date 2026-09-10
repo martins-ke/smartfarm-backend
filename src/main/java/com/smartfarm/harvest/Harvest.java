@@ -88,6 +88,7 @@ public class Harvest {
 		this.added_on = added_on;
 	}
 
+	@com.fasterxml.jackson.annotation.JsonIgnore
 	public Project getProject() {
 		return project;
 	}

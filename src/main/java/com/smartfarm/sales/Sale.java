@@ -181,6 +181,7 @@ public class Sale {
 		this.paymentStatus = paymentStatus;
 	}
 
+	@JsonIgnore
 	public Project getProject() {
 		return project;
 	}

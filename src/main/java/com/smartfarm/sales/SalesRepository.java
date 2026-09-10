@@ -17,6 +17,7 @@ public interface SalesRepository extends JpaRepository<Sale, String> {
 	List<Sale> findTop10ByOrderByAddedOnDesc();
 	Page<Sale> findByProjectId(String projectId, Pageable pageable);
 	List<Sale> findByCustomerId(String customerId);
+	List<Sale> findByCustomerIdOrderByAddedOnAsc(String customerId);
 	Page<Sale> findByCustomerId(String customerId, Pageable pageable);
 
 	@Query("SELECT COALESCE(SUM(s.total_amount), 0) FROM Sale s WHERE s.project.id = :projectId")

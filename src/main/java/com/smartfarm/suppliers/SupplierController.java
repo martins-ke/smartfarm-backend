@@ -49,6 +49,21 @@ public class SupplierController {
 		return supplierService.getSupplierPurchases(id);
 	}
 
+	@GetMapping("/purchases/{purchaseId}/payments")
+	public ResponseEntity<ApiResponse<List<SupplierPayment>>> getPurchasePaymentsDirect(@PathVariable String purchaseId) {
+		return supplierService.getPurchasePayments(purchaseId);
+	}
+
+	@GetMapping("/{id}/purchases/{purchaseId}/payments")
+	public ResponseEntity<ApiResponse<List<SupplierPayment>>> getPurchasePayments(@PathVariable String id, @PathVariable String purchaseId) {
+		return supplierService.getPurchasePayments(purchaseId);
+	}
+
+	@GetMapping("/{id}/payments")
+	public ResponseEntity<ApiResponse<List<SupplierPayment>>> getSupplierPayments(@PathVariable String id) {
+		return supplierService.getSupplierPayments(id);
+	}
+
 	@PostMapping("/purchases")
 	public ResponseEntity<ApiResponse<?>> recordPurchase(@Valid @RequestBody SupplierPurchaseRequest request) {
 		return supplierService.recordPurchase(request);

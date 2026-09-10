@@ -59,6 +59,7 @@ public class ActivityLaborAssignment {
 		this.id = id;
 	}
 
+	@JsonIgnore
 	public Activity getActivity() {
 		return activity;
 	}

@@ -92,7 +92,7 @@ public record DashboardSummaryResponse(
         String itemName,
         BigDecimal invoiceAmount,
         BigDecimal amountPaid,
-        BigDecimal balanceDue,
+        BigDecimal balanceDue, 
         String paymentStatus,
         String purchaseDate,
         String dueDate,

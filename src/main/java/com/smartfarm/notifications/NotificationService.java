@@ -101,7 +101,8 @@ public class NotificationService {
 		// Fetch overdue tasks
 		List<Activity> overdueTasks = activityRepo.findOverdueTasks(today);
 		for (Activity task : overdueTasks) {
-			long daysOverdue = ChronoUnit.DAYS.between(task.getScheduledDate(), today);
+			LocalDate schedDate = task.getScheduledDate() != null ? task.getScheduledDate() : task.getAdded_on();
+			long daysOverdue = schedDate != null ? ChronoUnit.DAYS.between(schedDate, today) : 0;
 			String projectName = task.getProject() != null ? task.getProject().getName() : "Farm Field";
 			String catSlug = (task.getProject() != null && task.getProject().getCategory() != null)
 					? task.getProject().getCategory().getName().toLowerCase()
@@ -113,7 +114,7 @@ public class NotificationService {
 				"TASKS",
 				"DANGER",
 				"⚠️ Overdue: " + task.getTitle(),
-				task.getType() + " on " + projectName + " was due " + daysOverdue + " day(s) ago (" + task.getScheduledDate() + ").",
+				task.getType() + " on " + projectName + " was due " + daysOverdue + " day(s) ago (" + (schedDate != null ? schedDate : today) + ").",
 				Instant.now().toString(),
 				projId.isEmpty() ? "/categories" : ("/categories/" + catSlug + "/projects/" + projId),
 				"View Task",
@@ -124,7 +125,8 @@ public class NotificationService {
 		// Fetch tasks due in the next 7 days (including today)
 		List<Activity> upcomingTasks = activityRepo.findUpcomingScheduledTasks(today, today.plusDays(7));
 		for (Activity task : upcomingTasks) {
-			long daysUntil = ChronoUnit.DAYS.between(today, task.getScheduledDate());
+			LocalDate schedDate = task.getScheduledDate() != null ? task.getScheduledDate() : task.getAdded_on();
+			long daysUntil = schedDate != null ? ChronoUnit.DAYS.between(today, schedDate) : 0;
 			String timingText = daysUntil == 0 ? "Due Today" : ("Due in " + daysUntil + " day(s)");
 			String severity = daysUntil == 0 ? "WARNING" : "INFO";
 			String projectName = task.getProject() != null ? task.getProject().getName() : "Farm Field";
@@ -138,7 +140,7 @@ public class NotificationService {
 				"TASKS",
 				severity,
 				(daysUntil == 0 ? "📅 " : "🕒 ") + timingText + ": " + task.getTitle(),
-				task.getType() + " scheduled for " + projectName + " on " + task.getScheduledDate() + ".",
+				task.getType() + " scheduled for " + projectName + " on " + (schedDate != null ? schedDate : today) + ".",
 				Instant.now().toString(),
 				projId.isEmpty() ? "/categories" : ("/categories/" + catSlug + "/projects/" + projId),
 				"Open Project",
@@ -151,6 +153,7 @@ public class NotificationService {
 			List<SupplierPurchase> unpaidPurchases = purchaseRepo.findByPaymentStatusIgnoreCase("UNPAID");
 			BigDecimal unpaidTotal = unpaidPurchases.stream()
 					.map(SupplierPurchase::getBalanceDue)
+					.filter(java.util.Objects::nonNull)
 					.reduce(BigDecimal.ZERO, BigDecimal::add);
 
 			if (unpaidTotal.compareTo(BigDecimal.ZERO) > 0) {
@@ -174,6 +177,7 @@ public class NotificationService {
 			if (!debtCustomers.isEmpty()) {
 				BigDecimal totalDebt = debtCustomers.stream()
 						.map(Customer::getOutstandingDebt)
+						.filter(java.util.Objects::nonNull)
 						.reduce(BigDecimal.ZERO, BigDecimal::add);
 
 				list.add(new NotificationResponse(

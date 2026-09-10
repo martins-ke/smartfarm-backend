@@ -80,7 +80,11 @@ public class ProjectsService {
 			id = IdGenarator.generateId(request.name().trim(), count);
 		}
 
-		Project p = new Project(id, request.name().trim(), request.season(), request.status(), request.startDate(), 
+		String status = (request.status() != null && ("completed".equalsIgnoreCase(request.status()) || "done".equalsIgnoreCase(request.status())))
+				? "completed"
+				: "active";
+
+		Project p = new Project(id, request.name().trim(), request.season(), status, request.startDate(), 
 						request.endDate(), request.budget(), request.description(), category);
 		return ResponseEntity.status(201).body(new ApiResponse<>(projectRepo.save(p), "Project created successfully", true, Instant.now())); 
 	}
@@ -242,7 +246,9 @@ public class ProjectsService {
 			}
 		}
 
-		String newStatus = request.status() != null ? request.status().trim().toLowerCase() : "active";
+		String newStatus = (request.status() != null && ("completed".equalsIgnoreCase(request.status()) || "done".equalsIgnoreCase(request.status())))
+				? "completed"
+				: "active";
 		project.setStatus(newStatus);
 		Project saved = projectRepo.save(project);
 
@@ -297,7 +303,12 @@ public class ProjectsService {
 			project.setName(request.name().trim());
 		}
 		if (request.season() != null)      project.setSeason(request.season());
-		if (request.status() != null)      project.setStatus(request.status());
+		if (request.status() != null) {
+			String status = ("completed".equalsIgnoreCase(request.status()) || "done".equalsIgnoreCase(request.status()))
+					? "completed"
+					: "active";
+			project.setStatus(status);
+		}
 		if (request.startDate() != null)   project.setStartDate(request.startDate());
 		if (request.endDate() != null)     project.setEndDate(request.endDate());
 		if (request.budget() != null)      project.setBudget(request.budget());

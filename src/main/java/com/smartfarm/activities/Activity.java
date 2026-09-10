@@ -150,6 +150,7 @@ public class Activity {
 		this.completedOn = completedOn;
 	}
 
+	@com.fasterxml.jackson.annotation.JsonIgnore
 	public Project getProject() {
 		return project;
 	}

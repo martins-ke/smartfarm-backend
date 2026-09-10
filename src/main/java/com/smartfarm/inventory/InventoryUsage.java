@@ -60,6 +60,7 @@ public class InventoryUsage {
         this.inventoryItem = inventoryItem;
     }
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     public Project getProject() {
         return project;
     }

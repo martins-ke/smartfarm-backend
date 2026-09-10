@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 public interface SupplierPurchaseRepository extends JpaRepository<SupplierPurchase, String> {
 
 	List<SupplierPurchase> findBySupplierIdOrderByPurchaseDateDesc(String supplierId);
+	List<SupplierPurchase> findBySupplierIdOrderByPurchaseDateAsc(String supplierId);
 
 	List<SupplierPurchase> findAllByOrderByPurchaseDateDesc();
 
