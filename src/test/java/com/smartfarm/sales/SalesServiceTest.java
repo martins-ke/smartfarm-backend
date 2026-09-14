@@ -52,7 +52,13 @@ class SalesServiceTest {
 	private CustomerService customerService;
 
 	@Mock
+	private com.smartfarm.customers.CustomerPaymentRepository customerPaymentRepo;
+
+	@Mock
 	private com.smartfarm.harvest.HarvestRepository harvestRepo;
+
+	@Mock
+	private com.smartfarm.user.UserRepository userRepo;
 
 	@InjectMocks
 	private SalesService salesService;
@@ -210,7 +216,7 @@ class SalesServiceTest {
 
 	@Test
 	void getSalesByProjectId_returnsList() {
-		Sale s1 = new Sale("S001", "Milk", 10, new BigDecimal("70"), null, new BigDecimal("700"), mockProject, null);
+		Sale s1 = new Sale("S001", "Milk", 10, new BigDecimal("70"), null, new BigDecimal("700"), new BigDecimal("700"), BigDecimal.ZERO, "CASH", "PAID_IN_FULL", mockProject, null);
 		org.springframework.data.domain.Page<Sale> page = new org.springframework.data.domain.PageImpl<>(List.of(s1));
 		when(salesRepo.findByProjectId("P001", org.springframework.data.domain.PageRequest.of(0, 10, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "addedOn")))).thenReturn(page);
 

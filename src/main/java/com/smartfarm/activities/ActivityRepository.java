@@ -9,9 +9,11 @@ import org.springframework.data.repository.query.Param;
 
 public interface ActivityRepository extends JpaRepository<Activity, String> {
 
-	List<Activity> findByProjectId(String projectId);
+	@Query("SELECT a FROM Activity a WHERE a.project.id = :projectId")
+	List<Activity> findByProjectId(@Param("projectId") String projectId);
 
-	List<Activity> findByProjectIdOrderByScheduledDateAsc(String projectId);
+	@Query("SELECT a FROM Activity a WHERE a.project.id = :projectId ORDER BY a.scheduledDate ASC")
+	List<Activity> findByProjectIdOrderByScheduledDateAsc(@Param("projectId") String projectId);
 
 	List<Activity> findByStatusIgnoreCase(String status);
 

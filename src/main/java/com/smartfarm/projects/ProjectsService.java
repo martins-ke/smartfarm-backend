@@ -34,13 +34,19 @@ public class ProjectsService {
 	private final ExpenseRepository expenseRepo;
 	private final SalesRepository salesRepo;
 	private final UserRepository userRepo;
+	private final com.smartfarm.activities.ActivityRepository activityRepo;
+	private final com.smartfarm.harvest.HarvestRepository harvestRepo;
+	private final com.smartfarm.inventory.InventoryUsageRepository inventoryUsageRepo;
 	
-	public ProjectsService(ProjectRepository projectRepo, CategoryRepository categoryRepo, ExpenseRepository expenseRepo, SalesRepository salesRepo, UserRepository userRepo) {
+	public ProjectsService(ProjectRepository projectRepo, CategoryRepository categoryRepo, ExpenseRepository expenseRepo, SalesRepository salesRepo, UserRepository userRepo, com.smartfarm.activities.ActivityRepository activityRepo, com.smartfarm.harvest.HarvestRepository harvestRepo, com.smartfarm.inventory.InventoryUsageRepository inventoryUsageRepo) {
 		this.projectRepo = projectRepo;
 		this.categoryRepo = categoryRepo;
 		this.expenseRepo = expenseRepo;
 		this.salesRepo = salesRepo;
 		this.userRepo = userRepo;
+		this.activityRepo = activityRepo;
+		this.harvestRepo = harvestRepo;
+		this.inventoryUsageRepo = inventoryUsageRepo;
 	}
 	
 	public ResponseEntity<ApiResponse<Project>> createProject(CreateProjectRequest request, String userId, String userRole){
@@ -148,21 +154,28 @@ public class ProjectsService {
 		BigDecimal totalSales = canViewFinancials ? salesRepo.totalSalesByProjectId(id) : BigDecimal.ZERO;
 		BigDecimal netValue = canViewFinancials ? totalSales.subtract(totalExpenses) : BigDecimal.ZERO;
 		BigDecimal displayBudget = canViewFinancials ? project.getBudget() : BigDecimal.ZERO;
-
 		List<ExpenseResponse> expenses = canViewFinancials ? project.getExpenses().stream().map(e -> new ExpenseResponse(
 				e.getId(), e.getTitle(), e.getAmount(), e.getUnitPrice(), e.getQuantity(), e.getAdded_on(), e.getNotes())).toList() : java.util.Collections.emptyList();
-		
 		List<com.smartfarm.sales.Sale> projectSales = canViewFinancials ? projectRepo.findProjectSales(id) : java.util.Collections.emptyList();
+		List<com.smartfarm.harvest.Harvest> harvests = projectRepo.findProjectHarvest(id);
+		List<com.smartfarm.activities.Activity> activities = projectRepo.findProjectActivities(id);
+		boolean hasExpenses = !expenseRepo.findByProjectId(id).isEmpty();
+		boolean hasSales = !salesRepo.findByProjectId(id).isEmpty();
+		boolean hasHarvest = !harvests.isEmpty();
+		boolean hasActivities = !activities.isEmpty();
+		boolean hasInventoryUsage = !inventoryUsageRepo.findByProjectId(id).isEmpty();
+		boolean hasRecords = hasExpenses || hasSales || hasHarvest || hasActivities || hasInventoryUsage;
 
 		ProjectResponse p = new ProjectResponse(project.getId(), project.getName(), project.getSeason(), displayBudget,
 				project.getStatus(), project.getStartDate(), project.getEndDate(), project.getDescription(), 
 				totalSales, totalExpenses, netValue,
 				expenses, 
 				projectSales, 
-				projectRepo.findProjectHarvest(id),
-				projectRepo.findProjectActivities(id));
+				harvests,
+				activities,
+				hasRecords);
 		
-		 return ResponseEntity.status(200).body(new ApiResponse<>( p, null, true, Instant.now()));
+		return ResponseEntity.status(200).body(new ApiResponse<>( p, null, true, Instant.now()));
 	}
 	
 	public ResponseEntity<ApiResponse<List<Project>>> getAllProjects(String userId, String userRole) {
@@ -366,7 +379,7 @@ public class ProjectsService {
 		User callingUser = null;
 		if (userId != null && !userId.trim().isEmpty()) {
 			callingUser = userRepo.findById(userId.trim()).orElse(null);
-			if (callingUser != null && effectiveRole == null) {
+			if (callingUser != null && effectiveRole == null && callingUser.getRole() != null) {
 				effectiveRole = callingUser.getRole().toUpperCase();
 			}
 		}
@@ -379,8 +392,8 @@ public class ProjectsService {
 			if (callingUser == null) {
 				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Manager credentials required.", false, Instant.now()));
 			}
-			boolean isAssigned = callingUser.getAssignedCategories().stream()
-					.anyMatch(c -> c.getId().equalsIgnoreCase(project.getCategory().getId()));
+			boolean isAssigned = project.getCategory() != null && callingUser.getAssignedCategories() != null && callingUser.getAssignedCategories().stream()
+					.anyMatch(c -> c != null && c.getId() != null && c.getId().equalsIgnoreCase(project.getCategory().getId()));
 			if (!isAssigned) {
 				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to manage the category for this project.", false, Instant.now()));
 			}
@@ -389,8 +402,24 @@ public class ProjectsService {
 			}
 		}
 
+		// Enforce business rule: A project can ONLY be deleted if it has NO records referencing it
+		boolean hasExpenses = !expenseRepo.findByProjectId(id).isEmpty();
+		boolean hasSales = !salesRepo.findByProjectId(id).isEmpty();
+		boolean hasHarvest = !harvestRepo.findByProjectId(id).isEmpty();
+		boolean hasActivities = !activityRepo.findByProjectId(id).isEmpty();
+		boolean hasInventoryUsage = !inventoryUsageRepo.findByProjectId(id).isEmpty();
+
+		if (hasExpenses || hasSales || hasHarvest || hasActivities || hasInventoryUsage) {
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, 
+				"Cannot delete project: active records (expenses, sales, harvests, activities, or inventory usages) are referencing this project. Deletion is only permitted for empty projects.", false, Instant.now()));
+		}
+
+		// Clean up entity references before removing
+		project.setCategory(null);
+		project.setSupervisor(null);
+		project.setManager(null);
 		projectRepo.delete(project);
-		return ResponseEntity.ok(new ApiResponse<>(null, "Project deleted successfully", true, Instant.now()));
+		return ResponseEntity.ok(new ApiResponse<>(null, "Project deleted successfully ✅", true, Instant.now()));
 	}
 
 	@Transactional

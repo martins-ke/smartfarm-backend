@@ -24,7 +24,8 @@ public record ProjectResponse(
 		List<ExpenseResponse> expenses,
 		List<Sale> sales,
 		List<Harvest> harvest,
-		List<Activity> activities
+		List<Activity> activities,
+		boolean hasRecords
 		) {
 
 }

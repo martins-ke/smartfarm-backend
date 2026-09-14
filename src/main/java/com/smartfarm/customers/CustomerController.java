@@ -65,28 +65,7 @@ public class CustomerController {
 	}
 
 	@PostMapping("/{id}/payments")
-	public ResponseEntity<ApiResponse<?>> recordPayment(@PathVariable String id, @RequestBody Map<String, Object> body) {
-		Object amtObj = body != null ? body.get("amount") : null;
-		BigDecimal amount = BigDecimal.ZERO;
-		if (amtObj != null && !amtObj.toString().trim().isEmpty()) {
-			amount = new BigDecimal(amtObj.toString().trim());
-		}
-
-		String paymentMode = body != null && body.get("paymentMode") != null ? body.get("paymentMode").toString() : "CASH";
-		String referenceNumber = body != null && body.get("referenceNumber") != null ? body.get("referenceNumber").toString() : null;
-		String saleId = body != null && body.get("saleId") != null && !body.get("saleId").toString().trim().isEmpty() 
-				? body.get("saleId").toString().trim() 
-				: null;
-		String notes = body != null && body.get("notes") != null ? body.get("notes").toString() : null;
-		
-		LocalDate paymentDate = LocalDate.now();
-		if (body != null && body.get("paymentDate") != null && !body.get("paymentDate").toString().trim().isEmpty()) {
-			try {
-				paymentDate = LocalDate.parse(body.get("paymentDate").toString().trim());
-			} catch (Exception e) {}
-		}
-
-		CustomerPaymentRequest req = new CustomerPaymentRequest(amount, paymentMode, referenceNumber, saleId, notes, paymentDate);
-		return customerService.settleCustomerDebt(id, req);
+	public ResponseEntity<ApiResponse<?>> recordPayment(@PathVariable String id, @Valid @RequestBody CustomerPaymentRequest request) {
+		return customerService.settleCustomerDebt(id, request);
 	}
 }

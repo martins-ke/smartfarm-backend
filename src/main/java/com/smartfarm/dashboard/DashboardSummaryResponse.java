@@ -14,9 +14,11 @@ public record DashboardSummaryResponse(
         BigDecimal revenue,
         BigDecimal receivedRevenue,
         BigDecimal pendingDebt,
+        BigDecimal supplierDebt,
         long activeProjects,
         long lowStockCount,
-        long customerCount
+        long customerCount,
+        long supplierDebtCount
     ) {}
 
     public record Charts(

@@ -69,7 +69,7 @@ class SalesControllerTest {
 		Project p = new Project();
 		p.setId("P001");
 		Customer c = new Customer("C001", "School cafeteria", "0784463737", "12345678", "Kitale", true);
-		Sale createdSale = new Sale("S001", "Milk", 20.0f, new BigDecimal("75.00"), LocalDate.now(), new BigDecimal("1500.00"), p, c);
+		Sale createdSale = new Sale("S001", "Milk", 20.0f, new BigDecimal("75.00"), LocalDate.now(), new BigDecimal("1500.00"), new BigDecimal("1500.00"), BigDecimal.ZERO, "CASH", "PAID_IN_FULL", p, c);
 
 		when(salesService.createSale(any(CreateSaleRequest.class)))
 				.thenReturn(ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(createdSale, "Sale recorded successfully ✅", true, Instant.now())));

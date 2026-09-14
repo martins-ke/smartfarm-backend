@@ -101,65 +101,39 @@ public class CustomerService {
 				.orElseThrow(() -> new EntityNotFoundException("Customer not found with ID: " + customerId));
 
 		BigDecimal paymentAmount = request.amount();
-		if (paymentAmount == null || paymentAmount.compareTo(BigDecimal.ZERO) <= 0) {
-			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Payment amount must be greater than zero!", false, Instant.now()));
+		Sale targetSale = salesRepo.findById(request.saleId().trim())
+				.orElseThrow(() -> new EntityNotFoundException("Sale invoice not found with ID: " + request.saleId()));
+
+		if (targetSale.getCustomer() == null || !customerId.equals(targetSale.getCustomer().getId())) {
+			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Sale invoice " + request.saleId() + " does not belong to customer " + customer.getName(), false, Instant.now()));
 		}
 
-		// Update cumulative customer accounts receivable totals
+		// 1. Update target Sale in sales table
+		BigDecimal currentPaid = targetSale.getAmountPaid() != null ? targetSale.getAmountPaid() : BigDecimal.ZERO;
+		BigDecimal totalAmount = targetSale.getTotal_amount() != null ? targetSale.getTotal_amount() : BigDecimal.ZERO;
+		BigDecimal newSalePaid = currentPaid.add(paymentAmount);
+		if (newSalePaid.compareTo(totalAmount) > 0) {
+			newSalePaid = totalAmount;
+		}
+		targetSale.setAmountPaid(newSalePaid);
+		BigDecimal newDue = totalAmount.subtract(newSalePaid);
+		if (newDue.compareTo(BigDecimal.ZERO) < 0) newDue = BigDecimal.ZERO;
+		targetSale.setBalanceDue(newDue);
+		targetSale.setPaymentStatus(newDue.compareTo(BigDecimal.ZERO) == 0 ? "PAID_IN_FULL" : "PARTIAL_PAYMENT");
+		salesRepo.save(targetSale);
+
+		// 2. Update Customer cumulative accounts receivable totals
 		customer.setTotalPaid(customer.getTotalPaid().add(paymentAmount));
 		BigDecimal remainingDebt = customer.getTotalPurchases().subtract(customer.getTotalPaid());
 		if (remainingDebt.compareTo(BigDecimal.ZERO) < 0) {
 			remainingDebt = BigDecimal.ZERO;
 		}
 		customer.setOutstandingDebt(remainingDebt);
-
-		if (remainingDebt.compareTo(BigDecimal.ZERO) == 0) {
-			customer.setCreditStatus("CLEAR");
-		} else if (customer.getCreditLimit().compareTo(BigDecimal.ZERO) > 0 && remainingDebt.compareTo(customer.getCreditLimit()) > 0) {
-			customer.setCreditStatus("BLOCKED");
-		} else {
-			customer.setCreditStatus("HAS_DEBT");
-		}
+		customer.setCreditStatus(remainingDebt.compareTo(BigDecimal.ZERO) == 0 ? "CLEAR"
+				: (customer.getCreditLimit().compareTo(BigDecimal.ZERO) > 0 && remainingDebt.compareTo(customer.getCreditLimit()) > 0 ? "BLOCKED" : "HAS_DEBT"));
 		customerRepo.save(customer);
 
-		Sale targetSale = null;
-		if (request.saleId() != null && !request.saleId().trim().isEmpty()) {
-			targetSale = salesRepo.findById(request.saleId().trim()).orElse(null);
-			if (targetSale != null) {
-				BigDecimal currentPaid = targetSale.getAmountPaid() != null ? targetSale.getAmountPaid() : BigDecimal.ZERO;
-				BigDecimal totalAmount = targetSale.getTotal_amount() != null ? targetSale.getTotal_amount() : BigDecimal.ZERO;
-				BigDecimal newSalePaid = currentPaid.add(paymentAmount);
-				if (newSalePaid.compareTo(totalAmount) > 0) {
-					newSalePaid = totalAmount;
-				}
-				targetSale.setAmountPaid(newSalePaid);
-				BigDecimal newDue = totalAmount.subtract(newSalePaid);
-				if (newDue.compareTo(BigDecimal.ZERO) < 0) newDue = BigDecimal.ZERO;
-				targetSale.setBalanceDue(newDue);
-				targetSale.setPaymentStatus(newDue.compareTo(BigDecimal.ZERO) == 0 ? "PAID_IN_FULL" : "PARTIAL_PAYMENT");
-				salesRepo.save(targetSale);
-			}
-		} else {
-			// FIFO allocation across customer's unpaid sales
-			List<Sale> customerSales = salesRepo.findByCustomerIdOrderByAddedOnAsc(customerId);
-			BigDecimal remainingToAllocate = paymentAmount;
-			for (Sale s : customerSales) {
-				BigDecimal due = s.getBalanceDue() != null ? s.getBalanceDue() : BigDecimal.ZERO;
-				if (due.compareTo(BigDecimal.ZERO) > 0) {
-					BigDecimal alloc = remainingToAllocate.min(due);
-					BigDecimal currentPaid = s.getAmountPaid() != null ? s.getAmountPaid() : BigDecimal.ZERO;
-					s.setAmountPaid(currentPaid.add(alloc));
-					BigDecimal newDue = due.subtract(alloc);
-					s.setBalanceDue(newDue);
-					s.setPaymentStatus(newDue.compareTo(BigDecimal.ZERO) == 0 ? "PAID_IN_FULL" : "PARTIAL_PAYMENT");
-					salesRepo.save(s);
-
-					remainingToAllocate = remainingToAllocate.subtract(alloc);
-					if (remainingToAllocate.compareTo(BigDecimal.ZERO) <= 0) break;
-				}
-			}
-		}
-
+		// 3. Record transaction in customer_payments audit table
 		long payCount = paymentRepo.count();
 		String payId = "PAY-CUST-" + String.format("%04d", payCount + 1);
 		while (paymentRepo.existsById(payId)) {
@@ -170,7 +144,6 @@ public class CustomerService {
 		String paymentMode = request.paymentMode() != null && !request.paymentMode().trim().isEmpty() 
 				? request.paymentMode().trim().toUpperCase() 
 				: "CASH";
-		LocalDate pDate = request.paymentDate() != null ? request.paymentDate() : LocalDate.now();
 
 		CustomerPayment paymentRecord = new CustomerPayment(
 			payId,
@@ -179,12 +152,12 @@ public class CustomerService {
 			paymentAmount,
 			paymentMode,
 			request.referenceNumber(),
-			pDate,
+			LocalDate.now(),
 			request.notes(),
 			remainingDebt
 		);
 		paymentRepo.save(paymentRecord);
 
-		return ResponseEntity.ok(new ApiResponse<>(customer, "Payment of KES " + paymentAmount + " recorded successfully. Remaining debt: KES " + remainingDebt + " ✅", true, Instant.now()));
+		return ResponseEntity.ok(new ApiResponse<>(customer, "Payment of KES " + paymentAmount + " recorded for invoice " + targetSale.getId() + ". Remaining debt: KES " + remainingDebt + " ✅", true, Instant.now()));
 	}
 }

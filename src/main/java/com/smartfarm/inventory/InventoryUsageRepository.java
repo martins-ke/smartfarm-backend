@@ -7,7 +7,13 @@ import org.springframework.stereotype.Repository;
 
 import com.smartfarm.projects.Project;
 
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
 @Repository
 public interface InventoryUsageRepository extends JpaRepository<InventoryUsage, String> {
     List<InventoryUsage> findByProject(Project project);
+
+    @Query("SELECT iu FROM InventoryUsage iu WHERE iu.project.id = :projectId")
+    List<InventoryUsage> findByProjectId(@Param("projectId") String projectId);
 }

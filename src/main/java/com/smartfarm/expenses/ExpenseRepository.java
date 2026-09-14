@@ -9,7 +9,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface ExpenseRepository extends JpaRepository<Expense, String> {
 
-	List<Expense> findByProjectId(String project_id);
+	@Query("SELECT e FROM Expense e WHERE e.project.id = :projectId")
+	List<Expense> findByProjectId(@Param("projectId") String projectId);
 
 	@Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.project.id = :projectId")
 	BigDecimal totalExpensesByProjectId(@Param("projectId") String projectId);

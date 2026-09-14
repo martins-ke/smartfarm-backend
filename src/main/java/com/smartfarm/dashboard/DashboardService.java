@@ -21,8 +21,10 @@ import com.smartfarm.expenses.Expense;
 import com.smartfarm.expenses.ExpenseRepository;
 import com.smartfarm.harvest.Harvest;
 import com.smartfarm.harvest.HarvestRepository;
+import com.smartfarm.suppliers.Supplier;
 import com.smartfarm.suppliers.SupplierPurchase;
 import com.smartfarm.suppliers.SupplierPurchaseRepository;
+import com.smartfarm.suppliers.SupplierRepository;
 import com.smartfarm.user.UserRepository;
 
 @Service
@@ -36,11 +38,13 @@ public class DashboardService {
     private final HarvestRepository harvestRepo;
     private final UserRepository userRepo;
     private final SupplierPurchaseRepository purchaseRepo;
+    private final SupplierRepository supplierRepo;
 
     public DashboardService(ProjectRepository projectRepo, SalesRepository salesRepo,
                             InventoryItemRepository inventoryRepo, CustomerRepository customerRepo,
                             ExpenseRepository expenseRepo, HarvestRepository harvestRepo,
-                            UserRepository userRepo, SupplierPurchaseRepository purchaseRepo) {
+                            UserRepository userRepo, SupplierPurchaseRepository purchaseRepo,
+                            SupplierRepository supplierRepo) {
         this.projectRepo = projectRepo;
         this.salesRepo = salesRepo;
         this.inventoryRepo = inventoryRepo;
@@ -49,6 +53,7 @@ public class DashboardService {
         this.harvestRepo = harvestRepo;
         this.userRepo = userRepo;
         this.purchaseRepo = purchaseRepo;
+        this.supplierRepo = supplierRepo;
     }
 
     public ResponseEntity<ApiResponse<DashboardSummaryResponse>> getSummary(String userId, String userRole) {
@@ -311,9 +316,21 @@ public class DashboardService {
             return t2.date().compareTo(t1.date());
         });
 
+        // Supplier Accounts Payable Debt (Total Farm Debt to Suppliers)
+        List<Supplier> allSuppliers = supplierRepo.findAll();
+        BigDecimal supplierDebt = allSuppliers.stream()
+                .map(Supplier::getBalanceOwed)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        long supplierDebtCount = allSuppliers.stream()
+                .map(Supplier::getBalanceOwed)
+                .filter(Objects::nonNull)
+                .filter(b -> b.compareTo(BigDecimal.ZERO) > 0)
+                .count();
+
         // Assembly
         DashboardSummaryResponse.Kpis kpis = new DashboardSummaryResponse.Kpis(
-                totalRevenue, receivedRevenue, pendingDebt, activeProjects, lowStockCount, customerCount
+                totalRevenue, receivedRevenue, pendingDebt, supplierDebt, activeProjects, lowStockCount, customerCount, supplierDebtCount
         );
         
         DashboardSummaryResponse.Charts charts = new DashboardSummaryResponse.Charts(

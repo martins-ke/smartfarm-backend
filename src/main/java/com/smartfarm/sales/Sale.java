@@ -52,22 +52,6 @@ public class Sale {
 	public Sale() {}
 
 	public Sale(String id, String item, float quantity, BigDecimal unit_price, LocalDate added_on,
-			BigDecimal total_amount, Project project, Customer customer) {
-		this.id = id;
-		this.item = item;
-		this.quantity = quantity;
-		this.unit_price = unit_price;
-		this.customer = customer;
-		this.addedOn = added_on;
-		this.total_amount = total_amount;
-		this.amountPaid = total_amount;
-		this.balanceDue = BigDecimal.ZERO;
-		this.paymentMode = "CASH";
-		this.paymentStatus = "PAID_IN_FULL";
-		this.project = project;
-	}
-
-	public Sale(String id, String item, float quantity, BigDecimal unit_price, LocalDate added_on,
 			BigDecimal total_amount, BigDecimal amountPaid, BigDecimal balanceDue, String paymentMode,
 			String paymentStatus, Project project, Customer customer) {
 		this.id = id;

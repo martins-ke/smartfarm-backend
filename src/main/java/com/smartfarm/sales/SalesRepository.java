@@ -11,11 +11,13 @@ import org.springframework.data.repository.query.Param;
 
 public interface SalesRepository extends JpaRepository<Sale, String> {
 
-	List<Sale> findByProjectId(String projectId);
+	@Query("SELECT s FROM Sale s WHERE s.project.id = :projectId")
+	List<Sale> findByProjectId(@Param("projectId") String projectId);
 	Page<Sale> findAll(Pageable pageable);
 	List<Sale> findAllByOrderByAddedOnDesc();
 	List<Sale> findTop10ByOrderByAddedOnDesc();
-	Page<Sale> findByProjectId(String projectId, Pageable pageable);
+	@Query("SELECT s FROM Sale s WHERE s.project.id = :projectId")
+	Page<Sale> findByProjectId(@Param("projectId") String projectId, Pageable pageable);
 	List<Sale> findByCustomerId(String customerId);
 	List<Sale> findByCustomerIdOrderByAddedOnAsc(String customerId);
 	Page<Sale> findByCustomerId(String customerId, Pageable pageable);
