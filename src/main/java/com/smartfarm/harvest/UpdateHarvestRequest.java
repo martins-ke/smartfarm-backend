@@ -2,13 +2,15 @@ package com.smartfarm.harvest;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
 public record UpdateHarvestRequest(
-		@NotNull @NotBlank(message = "Item name required!")
+		@NotBlank(message = "Item name is required")
 		String item,
-		@NotNull(message = "Harvest quantity required!")
+		@NotNull(message = "Harvest quantity is required")
+		@Positive(message = "Quantity must be greater than zero")
 		Float quantity,
-		@NotNull @NotBlank(message = "Units required!")
+		@NotBlank(message = "Units are required")
 		String units,
 		String notes
 ) {}

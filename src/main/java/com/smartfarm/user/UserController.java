@@ -163,6 +163,19 @@ public class UserController {
 		return service.updateProfile(id, request);
 	}
 
+	@PutMapping("/{id}")
+	public ResponseEntity<ApiResponse<User>> updateStaffDetails(
+			@PathVariable String id,
+			@RequestBody UpdateStaffRequest request,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
+			@RequestParam(required = false) String userId,
+			@RequestParam(required = false) String userRole) {
+		String effectiveUserId = userId != null ? userId : headerUserId;
+		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
+		return service.updateStaffDetails(id, request, effectiveUserId, effectiveUserRole);
+	}
+
 	@DeleteMapping("/{id}")
 	public ResponseEntity<ApiResponse<Void>> deleteUser(
 			@PathVariable String id,

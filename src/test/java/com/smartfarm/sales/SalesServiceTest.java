@@ -60,6 +60,9 @@ class SalesServiceTest {
 	@Mock
 	private com.smartfarm.user.UserRepository userRepo;
 
+	@Mock
+	private com.smartfarm.harvest.HarvestInventoryRepository harvestInventoryRepo;
+
 	@InjectMocks
 	private SalesService salesService;
 

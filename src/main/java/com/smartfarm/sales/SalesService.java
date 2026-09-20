@@ -21,10 +21,14 @@ import com.smartfarm.projects.ProjectRepository;
 import com.smartfarm.util.IdGenarator;
 
 import com.smartfarm.harvest.HarvestRepository;
+import com.smartfarm.harvest.HarvestInventoryRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class SalesService { 
+    private static final Logger log = LoggerFactory.getLogger(SalesService.class);
 
 	private final SalesRepository salesRepo;
 	private final ProjectRepository projectRepo;
@@ -33,8 +37,10 @@ public class SalesService {
 	private final com.smartfarm.customers.CustomerPaymentRepository customerPaymentRepo;
 	private final HarvestRepository harvestRepo;
 	private final com.smartfarm.user.UserRepository userRepo;
+	private final HarvestInventoryRepository harvestInventoryRepo;
 	
-	public SalesService(SalesRepository salesRepo, ProjectRepository projectRepo, CustomerRepository customerRepo, CustomerService customerService, com.smartfarm.customers.CustomerPaymentRepository customerPaymentRepo, HarvestRepository harvestRepo, com.smartfarm.user.UserRepository userRepo) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public SalesService(SalesRepository salesRepo, ProjectRepository projectRepo, CustomerRepository customerRepo, CustomerService customerService, com.smartfarm.customers.CustomerPaymentRepository customerPaymentRepo, HarvestRepository harvestRepo, com.smartfarm.user.UserRepository userRepo, HarvestInventoryRepository harvestInventoryRepo) {
 		this.salesRepo = salesRepo;
 		this.projectRepo = projectRepo;
 		this.customerRepo = customerRepo;
@@ -42,6 +48,11 @@ public class SalesService {
 		this.customerPaymentRepo = customerPaymentRepo;
 		this.harvestRepo = harvestRepo; 
 		this.userRepo = userRepo;
+		this.harvestInventoryRepo = harvestInventoryRepo;
+	}
+
+	public SalesService(SalesRepository salesRepo, ProjectRepository projectRepo, CustomerRepository customerRepo, CustomerService customerService, com.smartfarm.customers.CustomerPaymentRepository customerPaymentRepo, HarvestRepository harvestRepo, com.smartfarm.user.UserRepository userRepo) {
+		this(salesRepo, projectRepo, customerRepo, customerService, customerPaymentRepo, harvestRepo, userRepo, null);
 	}
 	
 	@Transactional
@@ -205,6 +216,19 @@ public class SalesService {
 		Sale sale = new Sale(id, request.item(), request.quantity(), request.unit_price(), LocalDate.now(), total_amount, amountPaid, balanceDue, paymentMode, paymentStatus, project, customer);
 		Sale savedSale = salesRepo.save(sale);
 
+        // Deduct sold quantity from harvest inventory
+        if (harvestInventoryRepo != null) {
+            harvestInventoryRepo
+                .findByProjectNameAndItemName(project.getName(), requestedItem)
+                .ifPresent(inv -> {
+                    float updated = Math.max(0f, inv.getAvailableQuantity() - request.quantity());
+                    inv.setAvailableQuantity(updated);
+                    harvestInventoryRepo.save(inv);
+                    log.info("Deducted {} from harvest inventory for item '{}' in project '{}'. Remaining: {}",
+                        request.quantity(), requestedItem, project.getName(), updated);
+                });
+        }
+
 		if (customer != null && amountPaid.compareTo(BigDecimal.ZERO) > 0) {
 			long payCount = customerPaymentRepo.count();
 			String payId = "PAY-CUST-" + String.format("%04d", payCount + 1);
@@ -281,17 +305,35 @@ public class SalesService {
 		return ResponseEntity.status(200).body(new ApiResponse<>(sale, "Sale details fetched successfully", true, Instant.now()));
 	}
 
-	@Transactional
-	public ResponseEntity<ApiResponse<Void>> deleteSale(String id, String userId, String userRole) {
-		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
-			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot delete sales.", false, Instant.now()));
-		}
-		if (!salesRepo.existsById(id)) {
-			throw new EntityNotFoundException("Sale not found with id: " + id);
-		}
-		salesRepo.deleteById(id);
-		return ResponseEntity.status(200).body(new ApiResponse<>(null, "Sale deleted successfully", true, Instant.now()));
-	}
+    @Transactional
+    public ResponseEntity<ApiResponse<Void>> deleteSale(String id, String userId, String userRole) {
+        if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+            return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot delete sales.", false, Instant.now()));
+        }
+        Sale sale = salesRepo.findById(id).orElse(null);
+        if (sale == null && !salesRepo.existsById(id)) {
+            throw new EntityNotFoundException("Sale not found with id: " + id);
+        }
+
+        if (sale != null) {
+            // Restore inventory when sale is deleted
+            String itemName = sale.getItem() != null ? sale.getItem().trim() : "";
+            String projectName = sale.getProject() != null ? sale.getProject().getName() : null;
+            if (harvestInventoryRepo != null && projectName != null && !itemName.isEmpty()) {
+                harvestInventoryRepo.findByProjectNameAndItemName(projectName, itemName)
+                    .ifPresent(inv -> {
+                        inv.setAvailableQuantity(inv.getAvailableQuantity() + sale.getQuantity());
+                        harvestInventoryRepo.save(inv);
+                        log.info("Restored {} to harvest inventory for '{}' in project '{}' after sale deletion.",
+                            sale.getQuantity(), itemName, projectName);
+                    });
+            }
+            salesRepo.delete(sale);
+        } else {
+            salesRepo.deleteById(id);
+        }
+        return ResponseEntity.status(200).body(new ApiResponse<>(null, "Sale deleted successfully", true, Instant.now()));
+    }
 
 	public ResponseEntity<ApiResponse<Void>> deleteSale(String id) {
 		return deleteSale(id, null, null);

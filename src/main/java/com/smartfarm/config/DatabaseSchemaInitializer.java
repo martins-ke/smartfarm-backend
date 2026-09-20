@@ -90,16 +90,6 @@ public class DatabaseSchemaInitializer implements ApplicationRunner {
                 + "purchase_date DATE, "
                 + "notes VARCHAR(500))");
 
-        // Ensure employee and labor assignment tables exist
-        executeSafely("CREATE TABLE IF NOT EXISTS employee ("
-                + "id VARCHAR(255) NOT NULL PRIMARY KEY, "
-                + "full_name VARCHAR(255) NOT NULL, "
-                + "id_number VARCHAR(255) UNIQUE NOT NULL, "
-                + "phone_number VARCHAR(255), "
-                + "employment_type VARCHAR(255), "
-                + "daily_rate DECIMAL(19,2) DEFAULT 0, "
-                + "status VARCHAR(255) DEFAULT 'ACTIVE')");
-
         executeSafely("CREATE TABLE IF NOT EXISTS activity_labor_assignments ("
                 + "id VARCHAR(255) NOT NULL PRIMARY KEY, "
                 + "activity_id VARCHAR(255) NOT NULL, "

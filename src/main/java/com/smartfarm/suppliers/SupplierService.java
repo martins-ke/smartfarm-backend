@@ -22,13 +22,16 @@ public class SupplierService {
 	private final SupplierPurchaseRepository purchaseRepo;
 	private final SupplierPaymentRepository paymentRepo;
 	private final InventoryItemRepository inventoryRepo;
+	private final com.smartfarm.user.UserRepository userRepo;
 
 	public SupplierService(SupplierRepository supplierRepo, SupplierPurchaseRepository purchaseRepo,
-			SupplierPaymentRepository paymentRepo, InventoryItemRepository inventoryRepo) {
+			SupplierPaymentRepository paymentRepo, InventoryItemRepository inventoryRepo,
+			com.smartfarm.user.UserRepository userRepo) {
 		this.supplierRepo = supplierRepo;
 		this.purchaseRepo = purchaseRepo;
 		this.paymentRepo = paymentRepo;
 		this.inventoryRepo = inventoryRepo;
+		this.userRepo = userRepo;
 	}
 
 	public ResponseEntity<ApiResponse<List<Supplier>>> getAllSuppliers() {
@@ -91,6 +94,11 @@ public class SupplierService {
 
 	@Transactional
 	public ResponseEntity<ApiResponse<?>> recordPurchase(SupplierPurchaseRequest req) {
+		return recordPurchase(req, null);
+	}
+
+	@Transactional
+	public ResponseEntity<ApiResponse<?>> recordPurchase(SupplierPurchaseRequest req, String callerUserId) {
 		Supplier supplier = supplierRepo.findById(req.supplierId())
 				.orElseThrow(() -> new EntityNotFoundException("Supplier not found with ID: " + req.supplierId()));
 
@@ -135,6 +143,15 @@ public class SupplierService {
 			}
 		}
 
+		String effectiveUserId = callerUserId != null && !callerUserId.trim().isEmpty()
+				? callerUserId.trim()
+				: (req.recordedById() != null && !req.recordedById().trim().isEmpty() ? req.recordedById().trim() : null);
+
+		com.smartfarm.user.User recordedByUser = null;
+		if (effectiveUserId != null) {
+			recordedByUser = userRepo.findById(effectiveUserId).orElse(null);
+		}
+
 		long count = purchaseRepo.count();
 		String purId = "PUR-" + String.format("%03d", count + 1);
 		while (purchaseRepo.existsById(purId)) {
@@ -157,7 +174,8 @@ public class SupplierService {
 			status,
 			req.purchaseDate() != null ? req.purchaseDate() : LocalDate.now(),
 			req.dueDate(),
-			req.notes().trim()
+			req.notes().trim(),
+			recordedByUser
 		);
 
 		SupplierPurchase saved = purchaseRepo.save(purchase);

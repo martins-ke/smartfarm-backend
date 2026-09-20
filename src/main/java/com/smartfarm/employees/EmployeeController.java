@@ -43,4 +43,9 @@ public class EmployeeController {
 		String status = (body != null) ? body.get("status") : null;
 		return employeeService.toggleEmployeeStatus(id, status);
 	}
+
+	@org.springframework.web.bind.annotation.PutMapping("/{id}")
+	public ResponseEntity<ApiResponse<Employee>> updateEmployee(@PathVariable String id, @RequestBody EmployeeRequest request) {
+		return employeeService.updateEmployee(id, request);
+	}
 }

@@ -65,8 +65,10 @@ public class SupplierController {
 	}
 
 	@PostMapping("/purchases")
-	public ResponseEntity<ApiResponse<?>> recordPurchase(@Valid @RequestBody SupplierPurchaseRequest request) {
-		return supplierService.recordPurchase(request);
+	public ResponseEntity<ApiResponse<?>> recordPurchase(
+			@Valid @RequestBody SupplierPurchaseRequest request,
+			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String callerUserId) {
+		return supplierService.recordPurchase(request, callerUserId);
 	}
 
 	@PostMapping("/{id}/payments")

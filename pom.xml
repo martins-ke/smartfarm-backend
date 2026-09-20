@@ -9,10 +9,10 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.smartfarm</groupId>
-	<artifactId>smartfarm-mng-app</artifactId>
+	<artifactId>agrosync-backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>smartfarm-mng-app</name>
-	<description/>
+	<name>agrosync-backend</name>
+	<description>AgroSync Cloud Farm Management REST API</description>
 	<url/>
 	<licenses>
 		<license/>

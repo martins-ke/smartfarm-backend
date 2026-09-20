@@ -609,6 +609,89 @@ public class UserService {
 	}
 
 	@Transactional
+	public ResponseEntity<ApiResponse<User>> updateStaffDetails(String id, UpdateStaffRequest request, String callerUserId, String callerUserRole) {
+		boolean isAdmin = "ADMIN".equalsIgnoreCase(callerUserRole);
+		boolean isManager = "MANAGER".equalsIgnoreCase(callerUserRole);
+
+		if (!isAdmin && !isManager) {
+			if (callerUserId != null && !callerUserId.trim().isEmpty()) {
+				User caller = userRepo.findById(callerUserId.trim()).orElse(null);
+				if (caller != null) {
+					isAdmin = "ADMIN".equalsIgnoreCase(caller.getRole());
+					isManager = "MANAGER".equalsIgnoreCase(caller.getRole());
+				}
+			}
+		}
+
+		if (!isAdmin && !isManager) {
+			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Only Administrators and Managers can update staff details.", false, Instant.now()));
+		}
+
+		User user = userRepo.findById(id)
+			.orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
+
+		if (isManager && !isAdmin) {
+			if (!"SUPERVISOR".equalsIgnoreCase(user.getRole())) {
+				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Managers can only update Supervisor accounts.", false, Instant.now()));
+			}
+		}
+
+		if (request.username() != null && !request.username().trim().isEmpty()) {
+			String newUsername = request.username().trim();
+			if (!newUsername.equalsIgnoreCase(user.getUsername()) && userRepo.existsByUsername(newUsername)) {
+				return ResponseEntity.status(400).body(new ApiResponse<>(null, "Username is already taken.", false, Instant.now()));
+			}
+			user.setUsername(newUsername);
+		}
+
+		if (request.email() != null) {
+			String newEmail = request.email().trim();
+			if (!newEmail.isEmpty()) {
+				if (!newEmail.equalsIgnoreCase(user.getEmail()) && userRepo.findByEmail(newEmail).isPresent()) {
+					return ResponseEntity.status(400).body(new ApiResponse<>(null, "Email is already in use by another account.", false, Instant.now()));
+				}
+				user.setEmail(newEmail);
+			} else {
+				user.setEmail(null);
+			}
+		}
+
+		if (isAdmin && request.role() != null && !request.role().trim().isEmpty()) {
+			user.setRole(request.role().trim().toUpperCase());
+		}
+
+		if (request.status() != null && !request.status().trim().isEmpty()) {
+			user.setStatus(request.status().trim().toUpperCase());
+		}
+
+		if (request.maxProjectCapacity() != null && request.maxProjectCapacity() > 0) {
+			user.setMaxProjectCapacity(request.maxProjectCapacity());
+		}
+
+		if (request.categoryIds() != null) {
+			Set<Category> categories = new HashSet<>(categoryRepo.findAllById(request.categoryIds()));
+			user.setAssignedCategories(categories);
+		}
+
+		if (request.privileges() != null) {
+			if (!isAdmin) {
+				Set<String> safeSupervisorPrivileges = new HashSet<>();
+				for (String priv : request.privileges()) {
+					if (priv != null && (priv.startsWith("CAN_RECORD_") || priv.startsWith("CAN_LOG_") || priv.startsWith("CAN_USE_"))) {
+						safeSupervisorPrivileges.add(priv.trim().toUpperCase());
+					}
+				}
+				user.setPrivileges(safeSupervisorPrivileges);
+			} else {
+				user.setPrivileges(request.privileges());
+			}
+		}
+
+		User saved = userRepo.save(user);
+		return ResponseEntity.ok(new ApiResponse<>(saved, "Staff details updated successfully ✅", true, Instant.now()));
+	}
+
+	@Transactional
 	public ResponseEntity<ApiResponse<Void>> deleteUser(String id) {
 		return deleteUser(id, null, null);
 	}

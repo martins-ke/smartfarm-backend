@@ -1,11 +1,11 @@
-# 🌱 SmartFarm Backend — Cloud Farm Management REST API
+# 🌱 AgroSync Backend — Cloud Farm Management REST API
 
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.x-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)
 ![Java](https://img.shields.io/badge/Java-21+-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![MySQL](https://img.shields.io/badge/MySQL-8.0+-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
 ![Spring Security](https://img.shields.io/badge/Spring_Security-6.x-6DB33F?style=for-the-badge&logo=springsecurity&logoColor=white)
 
-Enterprise-grade, zero-cost cloud backend API for **SmartFarm**, designed for multi-tier agricultural management (Farm Administrator, Farm Managers, and Field Supervisors).
+Enterprise-grade, zero-cost cloud backend API for **AgroSync**, designed for multi-tier agricultural management (Farm Administrator, Farm Managers, and Field Supervisors).
 
 ---
 

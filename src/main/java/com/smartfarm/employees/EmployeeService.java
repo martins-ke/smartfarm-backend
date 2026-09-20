@@ -8,7 +8,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.smartfarm.ApiResponse;
-import com.smartfarm.util.IdGenarator;
 
 @Service
 public class EmployeeService {
@@ -74,5 +73,43 @@ public class EmployeeService {
 			Employee saved = employeeRepo.save(emp);
 			return ResponseEntity.ok(new ApiResponse<>(saved, "Employee status updated to " + newStatus + " ✅", true, Instant.now()));
 		}).orElseGet(() -> ResponseEntity.status(404).body(new ApiResponse<>(null, "Employee not found with ID: " + id, false, Instant.now())));
+	}
+
+	@Transactional
+	public ResponseEntity<ApiResponse<Employee>> updateEmployee(String id, EmployeeRequest req) {
+		Employee employee = employeeRepo.findById(id).orElse(null);
+		if (employee == null) {
+			return ResponseEntity.status(404).body(new ApiResponse<>(null, "Employee not found with ID: " + id, false, Instant.now()));
+		}
+
+		if (req.fullName() != null && !req.fullName().trim().isEmpty()) {
+			employee.setFullName(req.fullName().trim());
+		}
+
+		if (req.idNumber() != null && !req.idNumber().trim().isEmpty()) {
+			String cleanId = req.idNumber().trim();
+			if (!cleanId.matches("^\\d{7,8}$")) {
+				return ResponseEntity.status(400).body(new ApiResponse<>(null, "Invalid National ID format. Must be a valid 7 to 8-digit government adult ID number.", false, Instant.now()));
+			}
+			if (!cleanId.equalsIgnoreCase(employee.getIdNumber()) && employeeRepo.existsByIdNumber(cleanId)) {
+				return ResponseEntity.status(400).body(new ApiResponse<>(null, "An employee with this National ID is already registered!", false, Instant.now()));
+			}
+			employee.setIdNumber(cleanId);
+		}
+
+		if (req.phoneNumber() != null) {
+			employee.setPhoneNumber(req.phoneNumber().trim());
+		}
+
+		if (req.employmentType() != null && !req.employmentType().trim().isEmpty()) {
+			employee.setEmploymentType(req.employmentType().trim().toUpperCase());
+		}
+
+		if (req.dailyRate() != null) {
+			employee.setDailyRate(req.dailyRate());
+		}
+
+		Employee saved = employeeRepo.save(employee);
+		return ResponseEntity.ok(new ApiResponse<>(saved, "Employee details updated successfully ✅", true, Instant.now()));
 	}
 }

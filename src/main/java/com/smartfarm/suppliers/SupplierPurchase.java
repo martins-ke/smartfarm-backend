@@ -5,7 +5,6 @@ import java.time.LocalDate;
 
 import org.hibernate.annotations.CreationTimestamp;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.smartfarm.inventory.InventoryItem;
 
 import jakarta.persistence.Column;
@@ -47,6 +46,10 @@ public class SupplierPurchase {
 	@CreationTimestamp
 	private LocalDate purchaseDate;
 
+	@ManyToOne
+	@JoinColumn(name = "recorded_by_id")
+	private com.smartfarm.user.User recordedBy;
+
 	private LocalDate dueDate;
 
 	private String notes;
@@ -55,7 +58,7 @@ public class SupplierPurchase {
 
 	public SupplierPurchase(String id, Supplier supplier, InventoryItem inventoryItem, String invoiceNumber,
 			BigDecimal invoiceAmount, BigDecimal amountPaid, BigDecimal balanceDue, String paymentStatus,
-			LocalDate purchaseDate, LocalDate dueDate, String notes) {
+			LocalDate purchaseDate, LocalDate dueDate, String notes, com.smartfarm.user.User recordedBy) {
 		this.id = id;
 		this.supplier = supplier;
 		this.inventoryItem = inventoryItem;
@@ -67,6 +70,13 @@ public class SupplierPurchase {
 		this.purchaseDate = purchaseDate != null ? purchaseDate : LocalDate.now();
 		this.dueDate = dueDate;
 		this.notes = notes;
+		this.recordedBy = recordedBy;
+	}
+
+	public SupplierPurchase(String id, Supplier supplier, InventoryItem inventoryItem, String invoiceNumber,
+			BigDecimal invoiceAmount, BigDecimal amountPaid, BigDecimal balanceDue, String paymentStatus,
+			LocalDate purchaseDate, LocalDate dueDate, String notes) {
+		this(id, supplier, inventoryItem, invoiceNumber, invoiceAmount, amountPaid, balanceDue, paymentStatus, purchaseDate, dueDate, notes, null);
 	}
 
 	public String getId() {
@@ -155,5 +165,13 @@ public class SupplierPurchase {
 
 	public void setNotes(String notes) {
 		this.notes = notes;
+	}
+
+	public com.smartfarm.user.User getRecordedBy() {
+		return recordedBy;
+	}
+
+	public void setRecordedBy(com.smartfarm.user.User recordedBy) {
+		this.recordedBy = recordedBy;
 	}
 }

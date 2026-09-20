@@ -67,4 +67,9 @@ final class HarvestController {
 		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
 		return harvestService.deleteHarvest(id, effectiveUserId, effectiveUserRole);
 	}
+	@org.springframework.web.bind.annotation.GetMapping("/inventory")
+	final ResponseEntity<ApiResponse<java.util.List<HarvestInventory>>> getHarvestInventory(){
+		
+		return harvestService.getHarvestInventory(); 
+	}
 }

@@ -1,10 +1,10 @@
-package com.smartfarm.smartfarm_mng_app;
+package com.smartfarm;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class SmartfarmMngAppApplicationTests {
+class AgroSyncApplicationTests {
 
 	@Test
 	void contextLoads() {

@@ -32,5 +32,7 @@ public record SupplierPurchaseRequest(
 	LocalDate dueDate,
 
 	@NotBlank(message = "Delivery notes / items description must be provided for clarity")
-	String notes
+	String notes,
+
+	String recordedById
 ) {}

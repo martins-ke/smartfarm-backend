@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: smartfarm-backend
+    name: agrosync-backend
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile

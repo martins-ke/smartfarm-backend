@@ -16,4 +16,7 @@ public interface SupplierPurchaseRepository extends JpaRepository<SupplierPurcha
 	List<SupplierPurchase> findTop10ByOrderByPurchaseDateDesc();
 
 	List<SupplierPurchase> findByPaymentStatusIgnoreCase(String paymentStatus);
+
+	List<SupplierPurchase> findByRecordedByIdOrderByPurchaseDateDesc(String recordedById);
+	List<SupplierPurchase> findByRecordedById(String recordedById);
 }

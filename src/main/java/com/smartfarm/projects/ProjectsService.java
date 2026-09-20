@@ -14,10 +14,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.smartfarm.ApiResponse;
+import com.smartfarm.activities.ActivityRepository;
 import com.smartfarm.category.Category;
 import com.smartfarm.category.CategoryRepository;
 import com.smartfarm.expenses.ExpenseRepository;
 import com.smartfarm.expenses.ExpenseResponse;
+import com.smartfarm.harvest.HarvestInventory;
+import com.smartfarm.harvest.HarvestInventoryRepository;
+import com.smartfarm.harvest.HarvestRepository;
+import com.smartfarm.inventory.InventoryUsageRepository;
 import com.smartfarm.sales.SalesRepository;
 import com.smartfarm.user.User;
 import com.smartfarm.user.UserRepository;
@@ -34,16 +39,22 @@ public class ProjectsService {
 	private final ExpenseRepository expenseRepo;
 	private final SalesRepository salesRepo;
 	private final UserRepository userRepo;
+	private final HarvestInventoryRepository harvestInventoryRepo;
 	private final com.smartfarm.activities.ActivityRepository activityRepo;
 	private final com.smartfarm.harvest.HarvestRepository harvestRepo;
-	private final com.smartfarm.inventory.InventoryUsageRepository inventoryUsageRepo;
+	private final com.smartfarm.inventory.InventoryUsageRepository inventoryUsageRepo; 
 	
-	public ProjectsService(ProjectRepository projectRepo, CategoryRepository categoryRepo, ExpenseRepository expenseRepo, SalesRepository salesRepo, UserRepository userRepo, com.smartfarm.activities.ActivityRepository activityRepo, com.smartfarm.harvest.HarvestRepository harvestRepo, com.smartfarm.inventory.InventoryUsageRepository inventoryUsageRepo) {
+	public ProjectsService(ProjectRepository projectRepo, CategoryRepository categoryRepo,
+			ExpenseRepository expenseRepo, SalesRepository salesRepo, UserRepository userRepo,
+			HarvestInventoryRepository harvestInventoryRepo, ActivityRepository activityRepo,
+			HarvestRepository harvestRepo, InventoryUsageRepository inventoryUsageRepo) {
+		super();
 		this.projectRepo = projectRepo;
 		this.categoryRepo = categoryRepo;
 		this.expenseRepo = expenseRepo;
 		this.salesRepo = salesRepo;
 		this.userRepo = userRepo;
+		this.harvestInventoryRepo = harvestInventoryRepo;
 		this.activityRepo = activityRepo;
 		this.harvestRepo = harvestRepo;
 		this.inventoryUsageRepo = inventoryUsageRepo;
@@ -275,6 +286,7 @@ public class ProjectsService {
 	public ResponseEntity<ApiResponse<Project>> updateProject(String id, UpdateProjectRequest request, String userId, String userRole) {
 		Project project = projectRepo.findById(id)
 				.orElseThrow(() -> new EntityNotFoundException("Project not found: " + id));
+		HarvestInventory inventoryItem = harvestInventoryRepo.findByProjectName(project.getName()).orElse(null); 
 
 		String effectiveRole = userRole != null ? userRole.trim().toUpperCase() : null;
 		User callingUser = null;
@@ -314,6 +326,7 @@ public class ProjectsService {
 				return ResponseEntity.status(400).body(new ApiResponse<>(null, "A project with the name '" + request.name().trim() + "' already exists! Please choose a unique name.", false, Instant.now()));
 			}
 			project.setName(request.name().trim());
+			if(inventoryItem != null) inventoryItem.setProjectName(request.name().trim());
 		}
 		if (request.season() != null)      project.setSeason(request.season());
 		if (request.status() != null) {
@@ -326,8 +339,10 @@ public class ProjectsService {
 		if (request.endDate() != null)     project.setEndDate(request.endDate());
 		if (request.budget() != null)      project.setBudget(request.budget());
 		if (request.description() != null) project.setDescription(request.description());
-
+		
 		Project saved = projectRepo.save(project);
+		harvestInventoryRepo.save(inventoryItem); 
+		
 		return ResponseEntity.ok(new ApiResponse<>(saved, "Project updated", true, Instant.now()));
 	}
 
