@@ -544,6 +544,7 @@ public class DashboardService {
             return supplierRepo.totalBalanceOwed();
         }
         return purchases.stream()
+                .filter(p -> p.getSupplier() == null || p.getSupplier().isActive())
                 .map(SupplierPurchase::getBalanceDue)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -554,6 +555,7 @@ public class DashboardService {
             return supplierRepo.countSuppliersWithDebt();
         }
         return purchases.stream()
+                .filter(p -> p.getSupplier() == null || p.getSupplier().isActive())
                 .filter(p -> p.getBalanceDue() != null && p.getBalanceDue().compareTo(BigDecimal.ZERO) > 0)
                 .map(p -> p.getSupplier() != null ? p.getSupplier().getId() : p.getId())
                 .distinct()

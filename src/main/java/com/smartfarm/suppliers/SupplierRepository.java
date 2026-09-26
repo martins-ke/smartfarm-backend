@@ -17,9 +17,9 @@ public interface SupplierRepository extends JpaRepository<Supplier, String> {
 
 	List<Supplier> findByIsActiveTrue();
 
-	@Query("SELECT COALESCE(SUM(s.balanceOwed), 0) FROM Supplier s")
+	@Query("SELECT COALESCE(SUM(s.balanceOwed), 0) FROM Supplier s WHERE s.isActive = true")
 	BigDecimal totalBalanceOwed();
 
-	@Query("SELECT COUNT(s) FROM Supplier s WHERE s.balanceOwed > 0")
+	@Query("SELECT COUNT(s) FROM Supplier s WHERE s.isActive = true AND s.balanceOwed > 0")
 	long countSuppliersWithDebt();
 }

@@ -97,6 +97,17 @@ public class SupplierService {
 	public ResponseEntity<ApiResponse<?>> deleteSupplier(String id) {
 		Supplier supplier = supplierRepo.findById(id)
 				.orElseThrow(() -> new EntityNotFoundException("Supplier not found with ID: " + id));
+
+		BigDecimal debt = supplier.getBalanceOwed() != null ? supplier.getBalanceOwed() : BigDecimal.ZERO;
+		if (debt.compareTo(BigDecimal.ZERO) > 0) {
+			return ResponseEntity.status(400).body(new ApiResponse<>(
+				null,
+				"Cannot delete supplier '" + supplier.getName() + "': Outstanding debt of KES " + debt + " exists. Clear all pending invoices first.",
+				false,
+				Instant.now()
+			));
+		}
+
 		supplier.setActive(false);
 		supplierRepo.save(supplier);
 		return ResponseEntity.ok(new ApiResponse<>(null, "Supplier deleted successfully ✅", true, Instant.now()));
