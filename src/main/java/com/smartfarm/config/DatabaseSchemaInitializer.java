@@ -102,6 +102,10 @@ public class DatabaseSchemaInitializer implements ApplicationRunner {
         // Ensure employees soft delete column exists
         addColumnSafely("employees", "is_deleted", "BOOLEAN DEFAULT FALSE");
 
+        // Ensure suppliers soft delete column exists
+        addColumnSafely("suppliers", "is_active", "BOOLEAN DEFAULT TRUE");
+        executeSafely("UPDATE suppliers SET is_active = TRUE WHERE is_active IS NULL");
+
         // Ensure join/helper tables exist
         executeSafely("CREATE TABLE IF NOT EXISTS user_assigned_categories ("
                 + "user_id VARCHAR(255) NOT NULL, "

@@ -3,6 +3,7 @@ package com.smartfarm.suppliers;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -39,6 +40,11 @@ public class SupplierController {
 	@PostMapping
 	public ResponseEntity<ApiResponse<?>> createSupplier(@Valid @RequestBody CreateSupplierRequest request, @AuthenticationPrincipal User currentUser) {
 		return supplierService.createSupplier(request);
+	}
+
+	@DeleteMapping("/{id}")
+	public ResponseEntity<ApiResponse<?>> deleteSupplier(@PathVariable String id, @AuthenticationPrincipal User currentUser) {
+		return supplierService.deleteSupplier(id);
 	}
 
 	@GetMapping("/purchases")

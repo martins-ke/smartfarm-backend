@@ -36,7 +36,7 @@ public class SupplierService {
 	}
 
 	public ResponseEntity<ApiResponse<List<Supplier>>> getAllSuppliers() {
-		List<Supplier> list = supplierRepo.findAll();
+		List<Supplier> list = supplierRepo.findByIsActiveTrue();
 		return ResponseEntity.ok(new ApiResponse<>(list, "Suppliers retrieved successfully ✅", true, Instant.now()));
 	}
 
@@ -91,6 +91,15 @@ public class SupplierService {
 
 		Supplier saved = supplierRepo.save(supplier);
 		return ResponseEntity.status(201).body(new ApiResponse<>(saved, "Supplier registered successfully ✅", true, Instant.now()));
+	}
+
+	@Transactional
+	public ResponseEntity<ApiResponse<?>> deleteSupplier(String id) {
+		Supplier supplier = supplierRepo.findById(id)
+				.orElseThrow(() -> new EntityNotFoundException("Supplier not found with ID: " + id));
+		supplier.setActive(false);
+		supplierRepo.save(supplier);
+		return ResponseEntity.ok(new ApiResponse<>(null, "Supplier deleted successfully ✅", true, Instant.now()));
 	}
 
 	@Transactional
