@@ -8,17 +8,31 @@ public record DashboardSummaryResponse(
     Charts charts,
     Tables tables,
     BudgetSummary budget,
-    Workforce workforce
+    Workforce workforce,
+    YearScope yearScope
 ) {
+    public DashboardSummaryResponse(Kpis kpis, Charts charts, Tables tables, BudgetSummary budget, Workforce workforce) {
+        this(kpis, charts, tables, budget, workforce, null);
+    }
+
+    public record YearScope(
+        String selectedYear,
+        List<String> availableYears
+    ) {}
+
     public record Kpis(
         BigDecimal revenue,
         BigDecimal receivedRevenue,
         BigDecimal pendingDebt,
         BigDecimal supplierDebt,
-        long activeProjects,
         long lowStockCount,
-        long customerCount,
-        long supplierDebtCount
+        long supplierDebtCount,
+        BigDecimal netProfit,
+        Double operatingMargin,
+        BigDecimal netWorkingCapital,
+        BigDecimal totalExpenses,
+        BigDecimal totalSuppliesCost,
+        BigDecimal totalOutflows
     ) {}
 
     public record Charts(
@@ -31,7 +45,30 @@ public record DashboardSummaryResponse(
         List<RecentHarvest> recentHarvests,
         List<RecentSaleTransaction> recentSales,
         List<RecentSupplyTransaction> recentSupplies,
-        List<RecentTransaction> recentTransactions
+        List<RecentTransaction> recentTransactions,
+        List<OperationalActivity> operationalActivities
+    ) {
+        public Tables(ProjectStatusSplit projectStatusSplit,
+                      List<RecentHarvest> recentHarvests,
+                      List<RecentSaleTransaction> recentSales,
+                      List<RecentSupplyTransaction> recentSupplies,
+                      List<RecentTransaction> recentTransactions) {
+            this(projectStatusSplit, recentHarvests, recentSales, recentSupplies, recentTransactions, List.of());
+        }
+    }
+
+    public record OperationalActivity(
+        String id,
+        String title,
+        String type,
+        String status,
+        String priority,
+        String scheduledDate,
+        String dueDate,
+        String notes,
+        String projectName,
+        String farmLocation,
+        long assignedWorkers
     ) {}
 
     public record SalesTrendData(

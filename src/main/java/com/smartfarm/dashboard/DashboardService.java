@@ -1,15 +1,20 @@
 package com.smartfarm.dashboard;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import com.smartfarm.ApiResponse;
-import com.smartfarm.customers.Customer;
+import com.smartfarm.activities.Activity;
+import com.smartfarm.activities.ActivityLaborAssignmentRepository;
+import com.smartfarm.activities.ActivityRepository;
 import com.smartfarm.customers.CustomerRepository;
 import com.smartfarm.inventory.InventoryItem;
 import com.smartfarm.inventory.InventoryItemRepository;
@@ -17,13 +22,15 @@ import com.smartfarm.projects.Project;
 import com.smartfarm.projects.ProjectRepository;
 import com.smartfarm.sales.Sale;
 import com.smartfarm.sales.SalesRepository;
-import com.smartfarm.expenses.Expense;
 import com.smartfarm.expenses.ExpenseRepository;
+import com.smartfarm.harvest.Harvest;
+import com.smartfarm.harvest.HarvestInventory;
+import com.smartfarm.harvest.HarvestInventoryRepository;
 import com.smartfarm.harvest.HarvestRepository;
-import com.smartfarm.suppliers.Supplier;
 import com.smartfarm.suppliers.SupplierPurchase;
 import com.smartfarm.suppliers.SupplierPurchaseRepository;
 import com.smartfarm.suppliers.SupplierRepository;
+import com.smartfarm.user.User;
 import com.smartfarm.user.UserRepository;
 
 @Service
@@ -38,12 +45,16 @@ public class DashboardService {
     private final UserRepository userRepo;
     private final SupplierPurchaseRepository purchaseRepo;
     private final SupplierRepository supplierRepo;
+    private final HarvestInventoryRepository harvestInventoryRepo;
+    private final ActivityRepository activityRepo;
+    private final ActivityLaborAssignmentRepository laborRepo;
 
     public DashboardService(ProjectRepository projectRepo, SalesRepository salesRepo,
                             InventoryItemRepository inventoryRepo, CustomerRepository customerRepo,
                             ExpenseRepository expenseRepo, HarvestRepository harvestRepo,
                             UserRepository userRepo, SupplierPurchaseRepository purchaseRepo,
-                            SupplierRepository supplierRepo) {
+                            SupplierRepository supplierRepo, HarvestInventoryRepository harvestInventoryRepo,
+                            ActivityRepository activityRepo, ActivityLaborAssignmentRepository laborRepo) {
         this.projectRepo = projectRepo;
         this.salesRepo = salesRepo;
         this.inventoryRepo = inventoryRepo;
@@ -53,14 +64,16 @@ public class DashboardService {
         this.userRepo = userRepo;
         this.purchaseRepo = purchaseRepo;
         this.supplierRepo = supplierRepo;
+        this.harvestInventoryRepo = harvestInventoryRepo;
+        this.activityRepo = activityRepo;
+        this.laborRepo = laborRepo;
     }
 
     // =========================================================================
     // 1. Immutable Scope Context (Encapsulates role access & assigned categories)
     // =========================================================================
     private record DashboardScopeContext(
-            String userId,
-            String userRole,
+            User currentUser,
             boolean isAdmin,
             boolean isManager,
             List<Project> relevantProjects,
@@ -73,25 +86,48 @@ public class DashboardService {
     // 2. Main Endpoints (Clean High-Level Orchestrations)
     // =========================================================================
 
-    public ResponseEntity<ApiResponse<DashboardSummaryResponse>> getSummary(String userId, String userRole) {
-        DashboardScopeContext ctx = resolveScopeContext(userId, userRole);
-        List<Sale> relevantSales = fetchRelevantSales(ctx);
-        List<SupplierPurchase> relevantPurchases = fetchRelevantPurchases(ctx);
+    public ResponseEntity<ApiResponse<DashboardSummaryResponse>> getSummary(User currentUser) {
+        return getSummary(currentUser, null);
+    }
 
-        DashboardSummaryResponse.Kpis kpis = buildKpis(ctx, relevantSales, relevantPurchases);
+    public ResponseEntity<ApiResponse<DashboardSummaryResponse>> getSummary(User currentUser, String yearParam) {
+        int currentYear = LocalDate.now().getYear();
+        List<String> availableYears = resolveAvailableYears(currentYear);
+        String selectedYear = resolveSelectedYear(yearParam, currentYear, availableYears);
+
+        LocalDate startDate = null;
+        LocalDate endDate = null;
+        if (!"ALL".equalsIgnoreCase(selectedYear)) {
+            try {
+                int y = Integer.parseInt(selectedYear);
+                startDate = LocalDate.of(y, 1, 1);
+                endDate = LocalDate.of(y, 12, 31);
+            } catch (NumberFormatException ignored) {
+                selectedYear = String.valueOf(currentYear);
+                startDate = LocalDate.of(currentYear, 1, 1);
+                endDate = LocalDate.of(currentYear, 12, 31);
+            }
+        }
+
+        DashboardScopeContext ctx = resolveScopeContext(currentUser, startDate, endDate);
+        List<Sale> relevantSales = fetchRelevantSales(ctx, startDate, endDate);
+        List<SupplierPurchase> relevantPurchases = fetchRelevantPurchases(ctx, startDate, endDate);
+
+        DashboardSummaryResponse.Kpis kpis = buildKpis(ctx, relevantSales, relevantPurchases, startDate, endDate);
         DashboardSummaryResponse.Charts charts = buildCharts(relevantSales);
         DashboardSummaryResponse.Tables tables = buildTables(ctx, relevantSales, relevantPurchases);
-        DashboardSummaryResponse.BudgetSummary budget = buildBudgetSummary(ctx);
+        DashboardSummaryResponse.BudgetSummary budget = buildBudgetSummary(ctx, kpis.totalExpenses());
         DashboardSummaryResponse.Workforce workforce = buildWorkforce(ctx);
+        DashboardSummaryResponse.YearScope yearScope = new DashboardSummaryResponse.YearScope(selectedYear, availableYears);
 
-        DashboardSummaryResponse response = new DashboardSummaryResponse(kpis, charts, tables, budget, workforce);
+        DashboardSummaryResponse response = new DashboardSummaryResponse(kpis, charts, tables, budget, workforce, yearScope);
         return ResponseEntity.ok(new ApiResponse<>(response, "Dashboard summary fetched successfully", true, java.time.Instant.now()));
     }
 
     public ResponseEntity<ApiResponse<PagedTransactionsResponse>> getTransactions(
-            String userId, String userRole, int page, int size, String filter, String search) {
+            User currentUser, int page, int size, String filter, String search) {
 
-        DashboardScopeContext ctx = resolveScopeContext(userId, userRole);
+        DashboardScopeContext ctx = resolveScopeContext(currentUser);
         List<Sale> relevantSales = fetchRelevantSales(ctx);
         List<SupplierPurchase> relevantPurchases = fetchRelevantPurchases(ctx);
 
@@ -133,21 +169,173 @@ public class DashboardService {
         return ResponseEntity.ok(new ApiResponse<>(response, "Transactions fetched successfully", true, java.time.Instant.now()));
     }
 
+    public ResponseEntity<ApiResponse<DashboardInventorySummaryResponse>> getInventorySummary(User currentUser) {
+        DashboardScopeContext ctx = resolveScopeContext(currentUser);
+
+        // 1. Supplies / Inputs Summary
+        List<InventoryItem> items = inventoryRepo.findAll().stream()
+                .filter(item -> isInventoryInScope(item, ctx))
+                .collect(Collectors.toList());
+
+        long totalItems = items.size();
+        BigDecimal totalValuation = BigDecimal.ZERO;
+        long inStockCount = 0;
+        long lowStockCount = 0;
+        long outOfStockCount = 0;
+
+        Map<String, List<InventoryItem>> byCategory = new HashMap<>();
+
+        for (InventoryItem item : items) {
+            BigDecimal qty = item.getQuantityInStock() != null ? item.getQuantityInStock() : BigDecimal.ZERO;
+            BigDecimal price = item.getUnitPrice() != null ? item.getUnitPrice() : BigDecimal.ZERO;
+            BigDecimal minStock = item.getMinStockLevel() != null ? item.getMinStockLevel() : BigDecimal.ZERO;
+
+            totalValuation = totalValuation.add(qty.multiply(price));
+
+            if (qty.compareTo(BigDecimal.ZERO) <= 0) {
+                outOfStockCount++;
+            } else if (qty.compareTo(minStock) <= 0) {
+                lowStockCount++;
+                inStockCount++;
+            } else {
+                inStockCount++;
+            }
+
+            String cat = item.getCategory() != null && !item.getCategory().trim().isEmpty() ? item.getCategory().trim() : "General Supplies";
+            byCategory.computeIfAbsent(cat, k -> new ArrayList<>()).add(item);
+        }
+
+        List<DashboardInventorySummaryResponse.CategoryValuation> categoryValuations = new ArrayList<>();
+        for (Map.Entry<String, List<InventoryItem>> entry : byCategory.entrySet()) {
+            BigDecimal catVal = entry.getValue().stream()
+                    .map(i -> (i.getQuantityInStock() != null ? i.getQuantityInStock() : BigDecimal.ZERO)
+                            .multiply(i.getUnitPrice() != null ? i.getUnitPrice() : BigDecimal.ZERO))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            categoryValuations.add(new DashboardInventorySummaryResponse.CategoryValuation(
+                    entry.getKey(),
+                    entry.getValue().size(),
+                    catVal
+            ));
+        }
+
+        categoryValuations.sort((a, b) -> b.valuation().compareTo(a.valuation()));
+
+        DashboardInventorySummaryResponse.SuppliesSummary suppliesSummary =
+                new DashboardInventorySummaryResponse.SuppliesSummary(
+                        totalItems,
+                        totalValuation,
+                        inStockCount,
+                        lowStockCount,
+                        outOfStockCount,
+                        categoryValuations
+                );
+
+        // 2. Harvest Produce Ready for Market
+        List<HarvestInventory> produceList = harvestInventoryRepo.findAll(org.springframework.data.domain.Sort.by("itemName").ascending());
+        if (!ctx.isAdmin()) {
+            Set<String> projectNames = ctx.relevantProjects().stream()
+                    .map(Project::getName)
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .map(String::toLowerCase)
+                    .collect(Collectors.toSet());
+            produceList = produceList.stream()
+                    .filter(p -> p.getProjectName() != null && projectNames.contains(p.getProjectName().trim().toLowerCase()))
+                    .collect(Collectors.toList());
+        }
+
+        float totalProduceQuantity = 0.0f;
+        List<DashboardInventorySummaryResponse.ProduceStockItem> availableProduce = new ArrayList<>();
+
+        for (HarvestInventory h : produceList) {
+            float qty = h.getAvailableQuantity();
+            if (qty > 0) {
+                totalProduceQuantity += qty;
+                String unit = h.getDisplayUnit() != null ? h.getDisplayUnit() : (h.getUnits() != null ? h.getUnits() : "units");
+                availableProduce.add(new DashboardInventorySummaryResponse.ProduceStockItem(
+                        h.getItemName(),
+                        qty,
+                        unit,
+                        h.getProjectName() != null ? h.getProjectName() : "General"
+                ));
+            }
+        }
+
+        DashboardInventorySummaryResponse.ProduceSummary produceSummary =
+                new DashboardInventorySummaryResponse.ProduceSummary(
+                        availableProduce.size(),
+                        totalProduceQuantity,
+                        availableProduce
+                );
+
+        DashboardInventorySummaryResponse response = new DashboardInventorySummaryResponse(suppliesSummary, produceSummary);
+        return ResponseEntity.ok(new ApiResponse<>(response, "Inventory summary fetched successfully", true, java.time.Instant.now()));
+    }
+
     // =========================================================================
     // 3. Scope & Category Access Resolvers
     // =========================================================================
 
-    private DashboardScopeContext resolveScopeContext(String userId, String userRole) {
-        boolean isAdmin = "ADMIN".equalsIgnoreCase(userRole);
-        boolean isManager = "MANAGER".equalsIgnoreCase(userRole);
+    private List<String> resolveAvailableYears(int currentYear) {
+        Integer pYear = projectRepo.findEarliestProjectYear();
+        Integer eYear = expenseRepo.findEarliestExpenseYear();
+        Integer sYear = salesRepo.findEarliestSaleYear();
+        Integer purYear = purchaseRepo.findEarliestPurchaseYear();
+
+        int earliest = currentYear;
+        for (Integer y : Arrays.asList(pYear, eYear, sYear, purYear)) {
+            if (y != null && y > 1900 && y < earliest) {
+                earliest = y;
+            }
+        }
+        if (earliest < currentYear - 100) {
+            earliest = currentYear - 100;
+        }
+
+        List<String> years = new ArrayList<>();
+        for (int y = currentYear + 1; y >= earliest; y--) {
+            years.add(String.valueOf(y));
+        }
+        years.add("ALL");
+        return years;
+    }
+
+    private String resolveSelectedYear(String yearParam, int currentYear, List<String> availableYears) {
+        if (yearParam != null && !yearParam.trim().isEmpty()) {
+            String trimmed = yearParam.trim().toUpperCase();
+            if ("ALL".equals(trimmed) || availableYears.contains(trimmed)) {
+                return trimmed;
+            }
+        }
+        return String.valueOf(currentYear);
+    }
+
+    private DashboardScopeContext resolveScopeContext(User currentUser) {
+        return resolveScopeContext(currentUser, null, null);
+    }
+
+    private DashboardScopeContext resolveScopeContext(User currentUser, LocalDate startDate, LocalDate endDate) {
+        boolean isAdmin = currentUser != null && "ADMIN".equalsIgnoreCase(currentUser.getRole());
+        boolean isManager = currentUser != null && "MANAGER".equalsIgnoreCase(currentUser.getRole());
+        String userId = currentUser != null ? currentUser.getId() : null;
 
         List<Project> relevantProjects;
-        if (isAdmin) {
-            relevantProjects = projectRepo.findAll();
-        } else if (isManager) {
-            relevantProjects = projectRepo.findProjectsListForManager(userId);
+        if (startDate == null || endDate == null) {
+            if (isAdmin) {
+                relevantProjects = projectRepo.findAll();
+            } else if (isManager) {
+                relevantProjects = projectRepo.findProjectsListForManager(userId);
+            } else {
+                relevantProjects = projectRepo.findBySupervisorId(userId);
+            }
         } else {
-            relevantProjects = projectRepo.findBySupervisorId(userId);
+            if (isAdmin) {
+                relevantProjects = projectRepo.findProjectsActiveBetween(startDate, endDate);
+            } else if (isManager) {
+                relevantProjects = projectRepo.findProjectsForManagerActiveBetween(userId, startDate, endDate);
+            } else {
+                relevantProjects = projectRepo.findProjectsForSupervisorActiveBetween(userId, startDate, endDate);
+            }
         }
 
         Set<String> projectIds = relevantProjects.stream()
@@ -157,8 +345,8 @@ public class DashboardService {
         Set<String> assignedCategoryIds = new HashSet<>();
         Set<String> assignedCategoryNames = new HashSet<>();
 
-        if (isManager && userId != null) {
-            userRepo.findById(userId).ifPresent(u -> {
+        if (isManager && currentUser != null) {
+            java.util.Optional.of(currentUser).ifPresent(u -> {
                 if (u.getAssignedCategories() != null) {
                     u.getAssignedCategories().forEach(c -> {
                         if (c.getId() != null) assignedCategoryIds.add(c.getId());
@@ -176,8 +364,7 @@ public class DashboardService {
         }
 
         return new DashboardScopeContext(
-                userId,
-                userRole,
+                currentUser,
                 isAdmin,
                 isManager,
                 relevantProjects,
@@ -188,17 +375,38 @@ public class DashboardService {
     }
 
     private List<Sale> fetchRelevantSales(DashboardScopeContext ctx) {
-        List<Sale> allSales = salesRepo.findAll();
-        if (ctx.isAdmin()) {
-            return allSales;
+        return fetchRelevantSales(ctx, null, null);
+    }
+
+    private List<Sale> fetchRelevantSales(DashboardScopeContext ctx, LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            if (ctx.isAdmin()) {
+                return salesRepo.findAll();
+            }
+            if (ctx.projectIds().isEmpty()) {
+                return Collections.emptyList();
+            }
+            return salesRepo.findByProjectIdIn(ctx.projectIds());
+        } else {
+            if (ctx.isAdmin()) {
+                return salesRepo.findAllBetween(startDate, endDate);
+            }
+            if (ctx.projectIds().isEmpty()) {
+                return Collections.emptyList();
+            }
+            return salesRepo.findByProjectIdInBetween(ctx.projectIds(), startDate, endDate);
         }
-        return allSales.stream()
-                .filter(s -> s.getProject() != null && ctx.projectIds().contains(s.getProject().getId()))
-                .collect(Collectors.toList());
     }
 
     private List<SupplierPurchase> fetchRelevantPurchases(DashboardScopeContext ctx) {
-        List<SupplierPurchase> allPurchases = purchaseRepo.findAllByOrderByPurchaseDateDesc();
+        return fetchRelevantPurchases(ctx, null, null);
+    }
+
+    private List<SupplierPurchase> fetchRelevantPurchases(DashboardScopeContext ctx, LocalDate startDate, LocalDate endDate) {
+        List<SupplierPurchase> allPurchases = (startDate == null || endDate == null)
+                ? purchaseRepo.findAllByOrderByPurchaseDateDesc()
+                : purchaseRepo.findAllBetween(startDate, endDate);
+
         if (ctx.isAdmin()) {
             return allPurchases;
         }
@@ -208,12 +416,12 @@ public class DashboardService {
                     .collect(Collectors.toList());
         }
         return allPurchases.stream()
-                .filter(p -> p.getRecordedBy() != null && ctx.userId() != null && ctx.userId().equals(p.getRecordedBy().getId()))
+                .filter(p -> p.getRecordedBy() != null && ctx.currentUser() != null && ctx.currentUser().getId() != null && ctx.currentUser().getId().equals(p.getRecordedBy().getId()))
                 .collect(Collectors.toList());
     }
 
     private boolean isPurchaseInManagerScope(SupplierPurchase p, DashboardScopeContext ctx) {
-        if (p.getRecordedBy() != null && ctx.userId() != null && ctx.userId().equals(p.getRecordedBy().getId())) {
+        if (p.getRecordedBy() != null && ctx.currentUser() != null && ctx.currentUser().getId() != null && ctx.currentUser().getId().equals(p.getRecordedBy().getId())) {
             return true;
         }
         if (p.getInventoryItem() != null && p.getInventoryItem().getCategory() != null) {
@@ -238,27 +446,74 @@ public class DashboardService {
     private DashboardSummaryResponse.Kpis buildKpis(
             DashboardScopeContext ctx,
             List<Sale> sales,
-            List<SupplierPurchase> purchases) {
+            List<SupplierPurchase> purchases,
+            LocalDate startDate,
+            LocalDate endDate) {
 
         BigDecimal totalRevenue = calculateTotalRevenue(sales);
         BigDecimal pendingDebt = calculateCustomerDebt(ctx, sales);
         BigDecimal receivedRevenue = calculateReceivedRevenue(sales);
         BigDecimal supplierDebt = calculateSupplierDebt(ctx, purchases);
         long supplierDebtCount = countSupplierDebtAccounts(ctx, purchases);
-        long activeProjects = countActiveProjects(ctx.relevantProjects());
         long lowStockCount = countLowStockItems(ctx);
-        long customerCount = countCustomers(ctx, sales);
+
+        BigDecimal totalExpenses = calculateExpenses(ctx, startDate, endDate);
+        BigDecimal totalSuppliesCost = calculateSuppliesCost(ctx, purchases, startDate, endDate);
+        BigDecimal totalOutflows = totalExpenses.add(totalSuppliesCost);
+
+        BigDecimal netProfit = receivedRevenue.subtract(totalOutflows);
+        Double operatingMargin = 0.0;
+        if (totalRevenue.compareTo(BigDecimal.ZERO) > 0) {
+            operatingMargin = Math.round((netProfit.doubleValue() / totalRevenue.doubleValue() * 100.0) * 10.0) / 10.0;
+        }
+        BigDecimal netWorkingCapital = receivedRevenue.add(pendingDebt).subtract(supplierDebt);
 
         return new DashboardSummaryResponse.Kpis(
                 totalRevenue,
                 receivedRevenue,
                 pendingDebt,
                 supplierDebt,
-                activeProjects,
                 lowStockCount,
-                customerCount,
-                supplierDebtCount
+                supplierDebtCount,
+                netProfit,
+                operatingMargin,
+                netWorkingCapital,
+                totalExpenses,
+                totalSuppliesCost,
+                totalOutflows
         );
+    }
+
+    private BigDecimal calculateExpenses(DashboardScopeContext ctx, LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null) {
+            if (ctx.isAdmin()) {
+                return expenseRepo.totalAllExpenses();
+            }
+            if (ctx.projectIds().isEmpty()) {
+                return BigDecimal.ZERO;
+            }
+            return expenseRepo.totalExpensesByProjectIds(ctx.projectIds());
+        } else {
+            if (ctx.isAdmin()) {
+                return expenseRepo.totalExpensesBetween(startDate, endDate);
+            }
+            if (ctx.projectIds().isEmpty()) {
+                return BigDecimal.ZERO;
+            }
+            return expenseRepo.totalExpensesByProjectIdsBetween(ctx.projectIds(), startDate, endDate);
+        }
+    }
+
+    private BigDecimal calculateSuppliesCost(DashboardScopeContext ctx, List<SupplierPurchase> purchases, LocalDate startDate, LocalDate endDate) {
+        if (ctx.isAdmin()) {
+            if (startDate == null || endDate == null) {
+                return purchaseRepo.totalAllPurchasePaid();
+            }
+            return purchaseRepo.totalPurchasePaidBetween(startDate, endDate);
+        }
+        return purchases.stream()
+                .map(p -> p.getAmountPaid() != null ? p.getAmountPaid() : (p.getInvoiceAmount() != null ? p.getInvoiceAmount() : BigDecimal.ZERO))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private BigDecimal calculateTotalRevenue(List<Sale> sales) {
@@ -276,10 +531,7 @@ public class DashboardService {
 
     private BigDecimal calculateCustomerDebt(DashboardScopeContext ctx, List<Sale> sales) {
         if (ctx.isAdmin()) {
-            return customerRepo.findAll().stream()
-                    .map(Customer::getOutstandingDebt)
-                    .filter(Objects::nonNull)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            return customerRepo.totalOutstandingDebt();
         }
         return sales.stream()
                 .map(Sale::getBalanceDue)
@@ -289,10 +541,7 @@ public class DashboardService {
 
     private BigDecimal calculateSupplierDebt(DashboardScopeContext ctx, List<SupplierPurchase> purchases) {
         if (ctx.isAdmin()) {
-            return supplierRepo.findAll().stream()
-                    .map(Supplier::getBalanceOwed)
-                    .filter(Objects::nonNull)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            return supplierRepo.totalBalanceOwed();
         }
         return purchases.stream()
                 .map(SupplierPurchase::getBalanceDue)
@@ -302,11 +551,7 @@ public class DashboardService {
 
     private long countSupplierDebtAccounts(DashboardScopeContext ctx, List<SupplierPurchase> purchases) {
         if (ctx.isAdmin()) {
-            return supplierRepo.findAll().stream()
-                    .map(Supplier::getBalanceOwed)
-                    .filter(Objects::nonNull)
-                    .filter(b -> b.compareTo(BigDecimal.ZERO) > 0)
-                    .count();
+            return supplierRepo.countSuppliersWithDebt();
         }
         return purchases.stream()
                 .filter(p -> p.getBalanceDue() != null && p.getBalanceDue().compareTo(BigDecimal.ZERO) > 0)
@@ -315,29 +560,14 @@ public class DashboardService {
                 .count();
     }
 
-    private long countActiveProjects(List<Project> projects) {
-        return projects.stream()
-                .filter(p -> !"COMPLETED".equalsIgnoreCase(p.getStatus()) && !"DONE".equalsIgnoreCase(p.getStatus()))
-                .count();
-    }
-
     private long countLowStockItems(DashboardScopeContext ctx) {
+        if (ctx.isAdmin()) {
+            return inventoryRepo.countLowStockItems();
+        }
         return inventoryRepo.findAll().stream()
                 .filter(item -> isInventoryInScope(item, ctx))
                 .filter(item -> item.getQuantityInStock() != null && item.getMinStockLevel() != null)
                 .filter(item -> item.getQuantityInStock().compareTo(item.getMinStockLevel()) <= 0)
-                .count();
-    }
-
-    private long countCustomers(DashboardScopeContext ctx, List<Sale> sales) {
-        if (ctx.isAdmin()) {
-            return customerRepo.count();
-        }
-        return sales.stream()
-                .map(Sale::getCustomer)
-                .filter(Objects::nonNull)
-                .map(Customer::getId)
-                .distinct()
                 .count();
     }
 
@@ -393,18 +623,56 @@ public class DashboardService {
             List<SupplierPurchase> purchases) {
 
         DashboardSummaryResponse.ProjectStatusSplit statusSplit = buildProjectStatusSplit(ctx.relevantProjects());
-        List<DashboardSummaryResponse.RecentHarvest> recentHarvests = buildRecentHarvests(ctx.projectIds(), 5);
-        List<DashboardSummaryResponse.RecentSaleTransaction> recentSales = buildRecentSales(sales, 10);
-        List<DashboardSummaryResponse.RecentSupplyTransaction> recentSupplies = buildRecentSupplies(purchases, 10);
+        List<DashboardSummaryResponse.RecentHarvest> recentHarvests = buildRecentHarvests(ctx, 5);
+        List<DashboardSummaryResponse.RecentSaleTransaction> recentSales = buildRecentSales(sales, 5);
+        List<DashboardSummaryResponse.RecentSupplyTransaction> recentSupplies = buildRecentSupplies(purchases, 5);
         List<DashboardSummaryResponse.RecentTransaction> recentTransactions = buildCombinedTransactions(recentSales, recentSupplies);
+        List<DashboardSummaryResponse.OperationalActivity> operationalActivities = buildOperationalActivities(ctx, 8);
 
         return new DashboardSummaryResponse.Tables(
                 statusSplit,
                 recentHarvests,
                 recentSales,
                 recentSupplies,
-                recentTransactions
+                recentTransactions,
+                operationalActivities
         );
+    }
+
+    private List<DashboardSummaryResponse.OperationalActivity> buildOperationalActivities(DashboardScopeContext ctx, int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        List<Activity> activities;
+        if (ctx.isAdmin()) {
+            activities = activityRepo.findOperationalActivities(pageable);
+        } else if (ctx.projectIds().isEmpty()) {
+            activities = Collections.emptyList();
+        } else {
+            activities = activityRepo.findOperationalActivitiesByProjectIds(ctx.projectIds(), pageable);
+        }
+
+        List<DashboardSummaryResponse.OperationalActivity> result = new ArrayList<>();
+        for (Activity a : activities) {
+            long workers = laborRepo.countByActivityId(a.getId());
+            String projName = a.getProject() != null ? a.getProject().getName() : "General";
+            String farmLoc = (a.getProject() != null && a.getProject().getCategory() != null)
+                    ? a.getProject().getCategory().getName()
+                    : "Main Farm";
+
+            result.add(new DashboardSummaryResponse.OperationalActivity(
+                    a.getId(),
+                    a.getTitle(),
+                    a.getType() != null ? a.getType() : "GENERAL",
+                    a.getStatus() != null ? a.getStatus() : "SCHEDULED",
+                    a.getPriority() != null ? a.getPriority() : "MEDIUM",
+                    a.getScheduledDate() != null ? a.getScheduledDate().toString() : "",
+                    a.getDueDate() != null ? a.getDueDate().toString() : "",
+                    a.getNotes() != null ? a.getNotes() : "",
+                    projName,
+                    farmLoc,
+                    workers
+            ));
+        }
+        return result;
     }
 
     private DashboardSummaryResponse.ProjectStatusSplit buildProjectStatusSplit(List<Project> projects) {
@@ -420,18 +688,21 @@ public class DashboardService {
         return new DashboardSummaryResponse.ProjectStatusSplit(0, active, completed);
     }
 
-    private List<DashboardSummaryResponse.RecentHarvest> buildRecentHarvests(Set<String> projectIds, int limit) {
-        return harvestRepo.findAll().stream()
-                .filter(h -> h.getProject() != null && projectIds.contains(h.getProject().getId()))
-                .sorted((h1, h2) -> {
-                    if (h1.getAdded_on() == null) return 1;
-                    if (h2.getAdded_on() == null) return -1;
-                    return h2.getAdded_on().compareTo(h1.getAdded_on());
-                })
-                .limit(limit)
+    private List<DashboardSummaryResponse.RecentHarvest> buildRecentHarvests(DashboardScopeContext ctx, int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        List<Harvest> list;
+        if (ctx.isAdmin()) {
+            list = harvestRepo.findRecent(pageable);
+        } else if (ctx.projectIds().isEmpty()) {
+            list = Collections.emptyList();
+        } else {
+            list = harvestRepo.findRecentByProjectIds(ctx.projectIds(), pageable);
+        }
+
+        return list.stream()
                 .map(h -> new DashboardSummaryResponse.RecentHarvest(
                         h.getId(),
-                        h.getProject().getName(),
+                        h.getProject() != null ? h.getProject().getName() : "Unknown",
                         h.getItem(),
                         h.getQuantity(),
                         h.getUnits(),
@@ -535,26 +806,19 @@ public class DashboardService {
     // 7. Budget & Workforce Aggregators
     // =========================================================================
 
-    private DashboardSummaryResponse.BudgetSummary buildBudgetSummary(DashboardScopeContext ctx) {
+    private DashboardSummaryResponse.BudgetSummary buildBudgetSummary(DashboardScopeContext ctx, BigDecimal totalSpent) {
         BigDecimal totalBudget = ctx.relevantProjects().stream()
                 .map(Project::getBudget)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal totalSpent = ctx.projectIds().stream()
-                .map(expenseRepo::findByProjectId)
-                .flatMap(List::stream)
-                .map(Expense::getAmount)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        return new DashboardSummaryResponse.BudgetSummary(totalBudget, totalSpent);
+        return new DashboardSummaryResponse.BudgetSummary(totalBudget, totalSpent != null ? totalSpent : BigDecimal.ZERO);
     }
 
     private DashboardSummaryResponse.Workforce buildWorkforce(DashboardScopeContext ctx) {
         long totalManagers = userRepo.countByRoleIgnoreCase("MANAGER");
         long totalSupervisors = userRepo.countByRoleIgnoreCase("SUPERVISOR");
-        long mySupervisors = ctx.isManager() ? userRepo.countByCreatedById(ctx.userId()) : 0;
+        long mySupervisors = ctx.isManager() && ctx.currentUser() != null ? userRepo.countByCreatedById(ctx.currentUser().getId()) : 0;
         return new DashboardSummaryResponse.Workforce(totalManagers, totalSupervisors, mySupervisors);
     }
 

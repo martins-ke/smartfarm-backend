@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import com.smartfarm.user.User;
 import org.springframework.stereotype.Service;
 
 
@@ -20,30 +21,27 @@ public class ExpenseService {
 
 	private final ExpenseRepository expenseRepo;
 	private final ProjectRepository projectRepo;
-	private final com.smartfarm.user.UserRepository userRepo;
-	
 	public ExpenseService(ExpenseRepository expenseRepo, ProjectRepository projectRepo, com.smartfarm.user.UserRepository userRepo) {
 		this.expenseRepo = expenseRepo;
 		this.projectRepo = projectRepo;
-		this.userRepo = userRepo;
 	}
 	
-	public ResponseEntity<ApiResponse<Expense>> createExpense(CreateExpenseRequest request, String userId, String userRole){
+	public ResponseEntity<ApiResponse<Expense>> createExpense(CreateExpenseRequest request, User currentUser){
 		Project project = projectRepo.findById(request.project_id()).orElseThrow(()-> new EntityNotFoundException("Project not in the system!"));
 
-		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
-			boolean isAssigned = project.getSupervisor() != null && userId != null && userId.trim().equals(project.getSupervisor().getId());
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole())) {
+			boolean isAssigned = project.getSupervisor() != null && currentUser != null && currentUser.getId().trim().equals(project.getSupervisor().getId());
 			if (!isAssigned) {
 				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to supervise this project.", false, Instant.now()));
 			}
-			if (userId != null) {
-				com.smartfarm.user.User sup = userRepo.findById(userId.trim()).orElse(null);
+			if (currentUser != null) {
+				com.smartfarm.user.User sup = currentUser;
 				if (sup == null || sup.getPrivileges() == null || !sup.getPrivileges().contains("CAN_RECORD_EXPENSES")) {
 					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You do not have privilege to record expenses.", false, Instant.now()));
 				}
 			}
-		} else if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-			com.smartfarm.user.User manager = userRepo.findById(userId.trim()).orElse(null);
+		} else if ("MANAGER".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			com.smartfarm.user.User manager = currentUser;
 			if (manager != null) {
 				boolean isAssigned = manager.getAssignedCategories().stream()
 						.anyMatch(c -> c.getId().equalsIgnoreCase(project.getCategory().getId()));
@@ -65,15 +63,15 @@ public class ExpenseService {
 	}
 
 	public ResponseEntity<ApiResponse<Expense>> createExpense(CreateExpenseRequest request) {
-		return createExpense(request, null, null);
+		return createExpense(request, null);
 	}
 	
-	public ResponseEntity<ApiResponse<List<Expense>>> getExpensesByProjectId(String projectId, String userId, String userRole) {
-		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+	public ResponseEntity<ApiResponse<List<Expense>>> getExpensesByProjectId(String projectId, User currentUser) {
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole())) {
 			return ResponseEntity.status(200).body(new ApiResponse<>(java.util.Collections.emptyList(), "Expenses shielded for supervisor.", true, Instant.now()));
 		}
-		if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-			com.smartfarm.user.User manager = userRepo.findById(userId.trim()).orElse(null);
+		if ("MANAGER".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			com.smartfarm.user.User manager = currentUser;
 			if (manager != null && (manager.getPrivileges() == null || !manager.getPrivileges().contains("CAN_VIEW_FINANCIALS"))) {
 				return ResponseEntity.status(200).body(new ApiResponse<>(java.util.Collections.emptyList(), "Financial privileges required to view expenses.", true, Instant.now()));
 			}
@@ -82,11 +80,11 @@ public class ExpenseService {
 	}
 
 	public ResponseEntity<ApiResponse<List<Expense>>> getExpensesByProjectId(String projectId) {
-		return getExpensesByProjectId(projectId, null, null);
+		return getExpensesByProjectId(projectId, null);
 	}
 
-	public ResponseEntity<ApiResponse<Expense>> updateExpense(String id, UpdateExpenseRequest request, String userId, String userRole) {
-		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+	public ResponseEntity<ApiResponse<Expense>> updateExpense(String id, UpdateExpenseRequest request, User currentUser) {
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole())) {
 			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot edit expenses.", false, Instant.now()));
 		}
 
@@ -114,11 +112,11 @@ public class ExpenseService {
 	}
 
 	public ResponseEntity<ApiResponse<Expense>> updateExpense(String id, UpdateExpenseRequest request) {
-		return updateExpense(id, request, null, null);
+		return updateExpense(id, request, null);
 	}
 
-	public ResponseEntity<ApiResponse<Void>> deleteExpense(String id, String userId, String userRole) {
-		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+	public ResponseEntity<ApiResponse<Void>> deleteExpense(String id, User currentUser) {
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole())) {
 			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot delete expenses.", false, Instant.now()));
 		}
 
@@ -130,6 +128,6 @@ public class ExpenseService {
 	}
 
 	public ResponseEntity<ApiResponse<Void>> deleteExpense(String id) {
-		return deleteExpense(id, null, null);
+		return deleteExpense(id, null);
 	}
 }

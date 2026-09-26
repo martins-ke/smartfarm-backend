@@ -20,6 +20,8 @@ import com.smartfarm.ApiResponse;
 
 import jakarta.validation.Valid;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+
 @RestController
 @CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173"})
 @RequestMapping("/users")
@@ -65,13 +67,8 @@ public class UserController {
 	public ResponseEntity<ApiResponse<User>> adminResetPassword(
 			@PathVariable String id,
 			@Valid @RequestBody AdminResetPasswordRequest request,
-			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
-			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
-			@RequestParam(required = false) String userId,
-			@RequestParam(required = false) String userRole) {
-		String effectiveUserId = userId != null ? userId : headerUserId;
-		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
-		return service.adminResetPassword(id, request, effectiveUserId, effectiveUserRole);
+			@AuthenticationPrincipal User currentUser) {
+		return service.adminResetPassword(id, request, currentUser);
 	}
 
 	@GetMapping
@@ -89,65 +86,40 @@ public class UserController {
 	@PostMapping("/create")
 	public ResponseEntity<ApiResponse<User>> createStaff(
 			@Valid @RequestBody CreateStaffRequest request,
-			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
-			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
-			@RequestParam(required = false) String userId,
-			@RequestParam(required = false) String userRole) {
-		String effectiveUserId = userId != null ? userId : headerUserId;
-		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
-		return service.createStaff(request, effectiveUserId, effectiveUserRole);
+			@AuthenticationPrincipal User currentUser) {
+		return service.createStaff(request, currentUser);
 	}
 
 	@PatchMapping("/{id}/status")
 	public ResponseEntity<ApiResponse<User>> updateUserStatus(
 			@PathVariable String id,
 			@Valid @RequestBody UpdateUserStatusRequest request,
-			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
-			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
-			@RequestParam(required = false) String userId,
-			@RequestParam(required = false) String userRole) {
-		String effectiveUserId = userId != null ? userId : headerUserId;
-		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
-		return service.updateUserStatus(id, request, effectiveUserId, effectiveUserRole);
+			@AuthenticationPrincipal User currentUser) {
+		return service.updateUserStatus(id, request, currentUser);
 	}
 
 	@PatchMapping("/{id}/privileges")
 	public ResponseEntity<ApiResponse<User>> updatePrivileges(
 			@PathVariable String id,
 			@RequestBody UpdatePrivilegesRequest request,
-			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
-			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
-			@RequestParam(required = false) String userId,
-			@RequestParam(required = false) String userRole) {
-		String effectiveUserId = userId != null ? userId : headerUserId;
-		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
-		return service.updatePrivileges(id, request, effectiveUserId, effectiveUserRole);
+			@AuthenticationPrincipal User currentUser) {
+		return service.updatePrivileges(id, request, currentUser);
 	}
 
 	@PutMapping("/{id}/categories")
 	public ResponseEntity<ApiResponse<User>> assignCategories(
 			@PathVariable String id,
 			@RequestBody AssignCategoriesRequest request,
-			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
-			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
-			@RequestParam(required = false) String userId,
-			@RequestParam(required = false) String userRole) {
-		String effectiveUserId = userId != null ? userId : headerUserId;
-		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
-		return service.assignCategories(id, request, effectiveUserId, effectiveUserRole);
+			@AuthenticationPrincipal User currentUser) {
+		return service.assignCategories(id, request, currentUser);
 	}
 
 	@PutMapping("/{id}/projects")
 	public ResponseEntity<ApiResponse<Void>> assignProjects(
 			@PathVariable String id,
 			@RequestBody AssignProjectsRequest request,
-			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
-			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
-			@RequestParam(required = false) String userId,
-			@RequestParam(required = false) String userRole) {
-		String effectiveUserId = userId != null ? userId : headerUserId;
-		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
-		return service.assignProjectsToSupervisor(id, request, effectiveUserId, effectiveUserRole);
+			@AuthenticationPrincipal User currentUser) {
+		return service.assignProjectsToSupervisor(id, request, currentUser);
 	}
 
 	@GetMapping("/{id}/projects")
@@ -167,24 +139,14 @@ public class UserController {
 	public ResponseEntity<ApiResponse<User>> updateStaffDetails(
 			@PathVariable String id,
 			@RequestBody UpdateStaffRequest request,
-			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
-			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
-			@RequestParam(required = false) String userId,
-			@RequestParam(required = false) String userRole) {
-		String effectiveUserId = userId != null ? userId : headerUserId;
-		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
-		return service.updateStaffDetails(id, request, effectiveUserId, effectiveUserRole);
+			@AuthenticationPrincipal User currentUser) {
+		return service.updateStaffDetails(id, request, currentUser);
 	}
 
 	@DeleteMapping("/{id}")
 	public ResponseEntity<ApiResponse<Void>> deleteUser(
 			@PathVariable String id,
-			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String headerUserId,
-			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Role", required = false) String headerUserRole,
-			@RequestParam(required = false) String userId,
-			@RequestParam(required = false) String userRole) {
-		String effectiveUserId = userId != null ? userId : headerUserId;
-		String effectiveUserRole = userRole != null ? userRole : headerUserRole;
-		return service.deleteUser(id, effectiveUserId, effectiveUserRole);
+			@AuthenticationPrincipal User currentUser) {
+		return service.deleteUser(id, currentUser);
 	}
 }

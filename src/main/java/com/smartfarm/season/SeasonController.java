@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.smartfarm.user.User;
 import org.springframework.web.bind.annotation.RestController;
 
 
@@ -23,24 +25,24 @@ public class SeasonController {
 	@Autowired SeasonService service; 
 
 	@PostMapping("/new")
-	public ResponseEntity<ApiResponse<?>> createSeason(@Valid @RequestBody CreateSeasonRequest request){
+	public ResponseEntity<ApiResponse<?>> createSeason(@Valid @RequestBody CreateSeasonRequest request, @AuthenticationPrincipal User currentUser){
 		
 		return service.createSeason(request); 
 	}
 	@GetMapping("/all/count")
-	public ResponseEntity<ApiResponse<Long>> allSeasons(){
+	public ResponseEntity<ApiResponse<Long>> allSeasons(@AuthenticationPrincipal User currentUser){
 		
 		return service.allSeasons(); 
 	}
 	
 	@GetMapping("/complete/count")
-	public ResponseEntity<ApiResponse<Long>> completeSeasons(){
+	public ResponseEntity<ApiResponse<Long>> completeSeasons(@AuthenticationPrincipal User currentUser){
 		
 		return service.completeSeasons(); 
 	}
 	
 	@GetMapping("/all")
-	public ResponseEntity<ApiResponse<List<Season>>> getSeasons() {
+	public ResponseEntity<ApiResponse<List<Season>>> getSeasons(@AuthenticationPrincipal User currentUser) {
 		
  
 		

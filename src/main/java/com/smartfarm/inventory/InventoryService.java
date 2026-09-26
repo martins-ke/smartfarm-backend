@@ -29,13 +29,10 @@ public class InventoryService {
     private final InventoryItemRepository inventoryRepo;
     private final ExpenseRepository expenseRepo;
     private final ProjectRepository projectRepo;
-    private final UserRepository userRepo;
-
     public InventoryService(InventoryItemRepository inventoryRepo, ExpenseRepository expenseRepo, ProjectRepository projectRepo, UserRepository userRepo) {
         this.inventoryRepo = inventoryRepo;
         this.expenseRepo = expenseRepo;
         this.projectRepo = projectRepo;
-        this.userRepo = userRepo;
     }
 
     public ResponseEntity<ApiResponse<Page<InventoryItem>>> getAllItems(int page, int size) {
@@ -44,8 +41,8 @@ public class InventoryService {
         return ResponseEntity.ok(new ApiResponse<>(result, "Inventory retrieved", true, Instant.now()));
     }
 
-    public ResponseEntity<ApiResponse<InventoryItem>> createItem(CreateInventoryItemRequest request, String userId, String userRole) {
-        if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+    public ResponseEntity<ApiResponse<InventoryItem>> createItem(CreateInventoryItemRequest request, User currentUser) {
+        if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole())) {
             return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot create inventory catalog items.", false, Instant.now()));
         }
 
@@ -70,11 +67,11 @@ public class InventoryService {
     }
 
     public ResponseEntity<ApiResponse<InventoryItem>> createItem(CreateInventoryItemRequest request) {
-        return createItem(request, null, null);
+        return createItem(request, null);
     }
 
-    public ResponseEntity<ApiResponse<InventoryItem>> updateItem(String id, CreateInventoryItemRequest request, String userId, String userRole) {
-        if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+    public ResponseEntity<ApiResponse<InventoryItem>> updateItem(String id, CreateInventoryItemRequest request, User currentUser) {
+        if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole())) {
             return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot edit inventory catalog items.", false, Instant.now()));
         }
 
@@ -93,28 +90,25 @@ public class InventoryService {
     }
 
     public ResponseEntity<ApiResponse<InventoryItem>> updateItem(String id, CreateInventoryItemRequest request) {
-        return updateItem(id, request, null, null);
+        return updateItem(id, request, null);
     }
 
     public ResponseEntity<ApiResponse<Void>> deleteItem(String id) {
-        return deleteItem(id, null, "ADMIN");
+        return deleteItem(id, (User) null);
     }
 
-    public ResponseEntity<ApiResponse<Void>> deleteItem(String id, String userId, String userRole) {
+    public ResponseEntity<ApiResponse<Void>> deleteItem(String id, User currentUser) {
         boolean authorized = false;
 
-        if (userRole != null && "ADMIN".equalsIgnoreCase(userRole.trim())) {
+        if (currentUser != null && currentUser.getRole() != null && "ADMIN".equalsIgnoreCase(currentUser.getRole().trim())) {
             authorized = true;
-        } else if (userId != null && !userId.trim().isEmpty()) {
-            User user = userRepo.findById(userId.trim()).orElse(null);
-            if (user != null) {
-                if ("ADMIN".equalsIgnoreCase(user.getRole())) {
-                    authorized = true;
-                } else if ("MANAGER".equalsIgnoreCase(user.getRole()) 
-                        && user.getPrivileges() != null 
-                        && user.getPrivileges().contains("CAN_DELETE_INVENTORY")) {
-                    authorized = true;
-                }
+        } else if (currentUser != null && currentUser.getId() != null && !currentUser.getId().trim().isEmpty()) {
+            if ("ADMIN".equalsIgnoreCase(currentUser.getRole())) {
+                authorized = true;
+            } else if ("MANAGER".equalsIgnoreCase(currentUser.getRole()) 
+                    && currentUser.getPrivileges() != null 
+                    && currentUser.getPrivileges().contains("CAN_DELETE_INVENTORY")) {
+                authorized = true;
             }
         }
 
@@ -129,26 +123,24 @@ public class InventoryService {
     }
 
     @Transactional
-    public ResponseEntity<ApiResponse<Expense>> useItem(String id, UseInventoryRequest request, String userId, String userRole) {
+    public ResponseEntity<ApiResponse<Expense>> useItem(String id, UseInventoryRequest request, User currentUser) {
         InventoryItem item = inventoryRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Inventory item not found"));
                 
         Project project = projectRepo.findById(request.projectId())
                 .orElseThrow(() -> new EntityNotFoundException("Project not found"));
 
-        if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
-            boolean isAssigned = project.getSupervisor() != null && userId != null && userId.trim().equals(project.getSupervisor().getId());
+        if (currentUser != null && "SUPERVISOR".equalsIgnoreCase(currentUser.getRole())) {
+            boolean isAssigned = project.getSupervisor() != null && currentUser.getId().trim().equals(project.getSupervisor().getId());
             if (!isAssigned) {
                 return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to supervise this project.", false, Instant.now()));
             }
-            if (userId != null) {
-                User sup = userRepo.findById(userId.trim()).orElse(null);
-                if (sup == null || sup.getPrivileges() == null || !sup.getPrivileges().contains("CAN_USE_INVENTORY")) {
-                    return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You do not have privilege to deduct inventory stock.", false, Instant.now()));
-                }
+            User sup = currentUser;
+            if (sup.getPrivileges() == null || !sup.getPrivileges().contains("CAN_USE_INVENTORY")) {
+                return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You do not have privilege to deduct inventory stock.", false, Instant.now()));
             }
-        } else if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-            User manager = userRepo.findById(userId.trim()).orElse(null);
+        } else if (currentUser != null && "MANAGER".equalsIgnoreCase(currentUser.getRole()) && !currentUser.getId().trim().isEmpty()) {
+            User manager = currentUser;
             if (manager != null) {
                 boolean isAssigned = manager.getAssignedCategories().stream()
                         .anyMatch(c -> c.getId().equalsIgnoreCase(project.getCategory().getId()));
@@ -189,6 +181,6 @@ public class InventoryService {
     }
 
     public ResponseEntity<ApiResponse<Expense>> useItem(String id, UseInventoryRequest request) {
-        return useItem(id, request, null, null);
+        return useItem(id, request, null);
     }
 }

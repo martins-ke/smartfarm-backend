@@ -63,7 +63,8 @@ class InventoryServiceTest {
     void deleteItem_asAdminRole_success() {
         when(inventoryRepo.findById("INV001")).thenReturn(Optional.of(sampleItem));
 
-        ResponseEntity<ApiResponse<Void>> response = inventoryService.deleteItem("INV001", null, "ADMIN");
+        User adminUser = new User("U_ADMIN", "admin", "admin@smartfarm.com", "pass", "ADMIN", "ACTIVE", null);
+        ResponseEntity<ApiResponse<Void>> response = inventoryService.deleteItem("INV001", adminUser);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody().success());
@@ -74,10 +75,9 @@ class InventoryServiceTest {
     @Test
     void deleteItem_asAdminUserById_success() {
         User adminUser = new User("U_ADMIN", "admin", "admin@smartfarm.com", "pass", "ADMIN", "ACTIVE", null);
-        when(userRepo.findById("U_ADMIN")).thenReturn(Optional.of(adminUser));
         when(inventoryRepo.findById("INV001")).thenReturn(Optional.of(sampleItem));
 
-        ResponseEntity<ApiResponse<Void>> response = inventoryService.deleteItem("INV001", "U_ADMIN", null);
+        ResponseEntity<ApiResponse<Void>> response = inventoryService.deleteItem("INV001", adminUser);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody().success());
@@ -89,10 +89,9 @@ class InventoryServiceTest {
         User manager = new User("U_MGR1", "manager1", "mgr@smartfarm.com", "pass", "MANAGER", "ACTIVE", null);
         manager.setPrivileges(new HashSet<>(Set.of("CAN_DELETE_INVENTORY", "CAN_VIEW_FINANCIALS")));
         
-        when(userRepo.findById("U_MGR1")).thenReturn(Optional.of(manager));
         when(inventoryRepo.findById("INV001")).thenReturn(Optional.of(sampleItem));
 
-        ResponseEntity<ApiResponse<Void>> response = inventoryService.deleteItem("INV001", "U_MGR1", "MANAGER");
+        ResponseEntity<ApiResponse<Void>> response = inventoryService.deleteItem("INV001", manager);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody().success());
@@ -104,9 +103,7 @@ class InventoryServiceTest {
         User manager = new User("U_MGR2", "manager2", "mgr2@smartfarm.com", "pass", "MANAGER", "ACTIVE", null);
         manager.setPrivileges(new HashSet<>(Set.of("CAN_CREATE_CATEGORIES"))); // No CAN_DELETE_INVENTORY
 
-        when(userRepo.findById("U_MGR2")).thenReturn(Optional.of(manager));
-
-        ResponseEntity<ApiResponse<Void>> response = inventoryService.deleteItem("INV001", "U_MGR2", "MANAGER");
+        ResponseEntity<ApiResponse<Void>> response = inventoryService.deleteItem("INV001", manager);
 
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
         assertFalse(response.getBody().success());
@@ -117,9 +114,8 @@ class InventoryServiceTest {
     @Test
     void deleteItem_asSupervisor_returnsForbidden() {
         User supervisor = new User("U_SUP", "sup1", "sup@smartfarm.com", "pass", "SUPERVISOR", "ACTIVE", null);
-        when(userRepo.findById("U_SUP")).thenReturn(Optional.of(supervisor));
 
-        ResponseEntity<ApiResponse<Void>> response = inventoryService.deleteItem("INV001", "U_SUP", "SUPERVISOR");
+        ResponseEntity<ApiResponse<Void>> response = inventoryService.deleteItem("INV001", supervisor);
 
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
         assertFalse(response.getBody().success());
@@ -129,7 +125,7 @@ class InventoryServiceTest {
 
     @Test
     void deleteItem_withNoAuthContext_returnsForbidden() {
-        ResponseEntity<ApiResponse<Void>> response = inventoryService.deleteItem("INV001", null, null);
+        ResponseEntity<ApiResponse<Void>> response = inventoryService.deleteItem("INV001", null);
 
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
         assertFalse(response.getBody().success());

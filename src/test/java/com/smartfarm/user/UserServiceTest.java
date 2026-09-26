@@ -27,6 +27,7 @@ import com.smartfarm.auth.PasswordResetTokenRepository;
 import com.smartfarm.category.CategoryRepository;
 import com.smartfarm.projects.Project;
 import com.smartfarm.projects.ProjectRepository;
+import com.smartfarm.security.JwtService;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -49,15 +50,20 @@ class UserServiceTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private JwtService jwtService;
+
     @InjectMocks
     private UserService userService;
 
+    private User admin;
     private User supervisor;
     private Project project1;
     private Project project2;
 
     @BeforeEach
     void setUp() {
+        admin = new User("ADMIN01", "admin", "admin@smartfarm.com", "pass", "ADMIN", "ACTIVE", null);
         supervisor = new User("SUP002", "supervisor2", "sup2@smartfarm.com", "pass", "SUPERVISOR", "ACTIVE", "ADMIN01");
         supervisor.setMaxProjectCapacity(4);
 
@@ -78,7 +84,7 @@ class UserServiceTest {
         when(projectRepo.findById("PROJ002")).thenReturn(Optional.of(project2));
 
         AssignProjectsRequest request = new AssignProjectsRequest(List.of("PROJ001", "PROJ002"));
-        ResponseEntity<ApiResponse<Void>> response = userService.assignProjectsToSupervisor("SUP002", request);
+        ResponseEntity<ApiResponse<Void>> response = userService.assignProjectsToSupervisor("SUP002", request, admin);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody().success());
@@ -94,7 +100,7 @@ class UserServiceTest {
         when(userRepo.findById("SUP002")).thenReturn(Optional.of(supervisor));
 
         AssignProjectsRequest request = new AssignProjectsRequest(List.of("PROJ001", "PROJ002"));
-        ResponseEntity<ApiResponse<Void>> response = userService.assignProjectsToSupervisor("SUP002", request);
+        ResponseEntity<ApiResponse<Void>> response = userService.assignProjectsToSupervisor("SUP002", request, admin);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertFalse(response.getBody().success());
@@ -109,7 +115,7 @@ class UserServiceTest {
         when(projectRepo.findById("PROJ001")).thenReturn(Optional.of(project1));
 
         AssignProjectsRequest request = new AssignProjectsRequest(List.of("PROJ001"));
-        ResponseEntity<ApiResponse<Void>> response = userService.assignProjectsToSupervisor("SUP002", request);
+        ResponseEntity<ApiResponse<Void>> response = userService.assignProjectsToSupervisor("SUP002", request, admin);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody().success());
@@ -129,7 +135,7 @@ class UserServiceTest {
             5
         );
 
-        ResponseEntity<ApiResponse<User>> response = userService.updatePrivileges("SUP002", request, "MGR001", "MANAGER");
+        ResponseEntity<ApiResponse<User>> response = userService.updatePrivileges("SUP002", request, manager);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody().success());
@@ -143,10 +149,9 @@ class UserServiceTest {
         User manager2 = new User("MGR002", "manager2", "mgr2@farm.com", "pass", "MANAGER", "ACTIVE", "ADMIN01");
 
         when(userRepo.findById("MGR002")).thenReturn(Optional.of(manager2));
-        when(userRepo.findById("MGR001")).thenReturn(Optional.of(manager1));
 
         UpdatePrivilegesRequest request = new UpdatePrivilegesRequest(java.util.Set.of("CAN_CREATE_CATEGORIES"), 4);
-        ResponseEntity<ApiResponse<User>> response = userService.updatePrivileges("MGR002", request, "MGR001", "MANAGER");
+        ResponseEntity<ApiResponse<User>> response = userService.updatePrivileges("MGR002", request, manager1);
 
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
         assertFalse(response.getBody().success());

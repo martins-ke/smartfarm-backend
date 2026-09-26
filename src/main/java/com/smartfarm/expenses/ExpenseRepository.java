@@ -14,4 +14,19 @@ public interface ExpenseRepository extends JpaRepository<Expense, String> {
 
 	@Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.project.id = :projectId")
 	BigDecimal totalExpensesByProjectId(@Param("projectId") String projectId);
+
+	@Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e")
+	BigDecimal totalAllExpenses();
+
+	@Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.project.id IN :projectIds")
+	BigDecimal totalExpensesByProjectIds(@Param("projectIds") java.util.Collection<String> projectIds);
+
+	@Query("SELECT MIN(YEAR(e.added_on)) FROM Expense e WHERE e.added_on IS NOT NULL")
+	Integer findEarliestExpenseYear();
+
+	@Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.added_on BETWEEN :startDate AND :endDate")
+	BigDecimal totalExpensesBetween(@Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate);
+
+	@Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.project.id IN :projectIds AND e.added_on BETWEEN :startDate AND :endDate")
+	BigDecimal totalExpensesByProjectIdsBetween(@Param("projectIds") java.util.Collection<String> projectIds, @Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate);
 }

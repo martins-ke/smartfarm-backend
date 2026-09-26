@@ -11,7 +11,17 @@ public interface EmployeeRepository extends JpaRepository<Employee, String> {
 
 	boolean existsByIdNumber(String idNumber);
 
+	boolean existsByIdNumberAndIsDeletedFalse(String idNumber);
+
 	Optional<Employee> findByIdNumber(String idNumber);
 
+	Optional<Employee> findByIdNumberAndIsDeletedFalse(String idNumber);
+
 	List<Employee> findByStatusIgnoreCase(String status);
+
+	List<Employee> findByIsDeletedFalse();
+
+	List<Employee> findByStatusIgnoreCaseAndIsDeletedFalse(String status);
+
+	Optional<Employee> findByIdAndIsDeletedFalse(String id);
 }

@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import com.smartfarm.user.User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -98,7 +99,7 @@ public class SupplierService {
 	}
 
 	@Transactional
-	public ResponseEntity<ApiResponse<?>> recordPurchase(SupplierPurchaseRequest req, String callerUserId) {
+	public ResponseEntity<ApiResponse<?>> recordPurchase(SupplierPurchaseRequest req, User currentUser) {
 		Supplier supplier = supplierRepo.findById(req.supplierId())
 				.orElseThrow(() -> new EntityNotFoundException("Supplier not found with ID: " + req.supplierId()));
 
@@ -143,14 +144,10 @@ public class SupplierService {
 			}
 		}
 
-		String effectiveUserId = callerUserId != null && !callerUserId.trim().isEmpty()
-				? callerUserId.trim()
-				: (req.recordedById() != null && !req.recordedById().trim().isEmpty() ? req.recordedById().trim() : null);
 
-		com.smartfarm.user.User recordedByUser = null;
-		if (effectiveUserId != null) {
-			recordedByUser = userRepo.findById(effectiveUserId).orElse(null);
-		}
+		String recordedById = currentUser.getId();
+		com.smartfarm.user.User recordedByUser = userRepo.findById(recordedById).orElse(currentUser);
+
 
 		long count = purchaseRepo.count();
 		String purId = "PUR-" + String.format("%03d", count + 1);

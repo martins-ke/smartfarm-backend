@@ -15,11 +15,21 @@ import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.util.Collection;
+import java.util.List;
 
 @Entity
 @Table(name = "users")
-public class User {
+public class User implements UserDetails {
 
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
 	@Id
 	private String id;
 	@Column(unique = true, nullable = false)
@@ -168,5 +178,30 @@ public class User {
 	}
 	public void setAssignedProjectsCount(Integer assignedProjectsCount) {
 		this.assignedProjectsCount = assignedProjectsCount;
+	}
+
+	@Override
+	public Collection<? extends GrantedAuthority> getAuthorities() {
+		return List.of(new SimpleGrantedAuthority("ROLE_" + (this.role != null ? this.role.toUpperCase() : "SUPERVISOR")));
+	}
+
+	@Override
+	public boolean isAccountNonExpired() {
+		return true;
+	}
+
+	@Override
+	public boolean isAccountNonLocked() {
+		return !"DISABLED".equalsIgnoreCase(this.status);
+	}
+
+	@Override
+	public boolean isCredentialsNonExpired() {
+		return true;
+	}
+
+	@Override
+	public boolean isEnabled() {
+		return "ACTIVE".equalsIgnoreCase(this.status);
 	}
 }

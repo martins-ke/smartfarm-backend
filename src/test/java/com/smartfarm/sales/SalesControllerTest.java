@@ -70,7 +70,7 @@ class SalesControllerTest {
 		Customer c = new Customer("C001", "School cafeteria", "0784463737", "12345678", "Kitale", true);
 		Sale createdSale = new Sale("S001", "Milk", 20.0f, new BigDecimal("75.00"), LocalDate.now(), new BigDecimal("1500.00"), new BigDecimal("1500.00"), BigDecimal.ZERO, "CASH", "PAID_IN_FULL", p, c);
 
-		when(salesService.createSale(any(CreateSaleRequest.class)))
+		when(salesService.createSale(any(CreateSaleRequest.class), any()))
 				.thenReturn(ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(createdSale, "Sale recorded successfully ✅", true, Instant.now())));
 
 		mockMvc.perform(post("/sales/create")
@@ -107,7 +107,7 @@ class SalesControllerTest {
 	@Test
 	void getSalesByProjectId_returnsList() throws Exception {
 		// Test that the controller delegates to the service correctly
-		when(salesService.getSalesByProjectId("P001", 0, 20))
+		when(salesService.getSalesByProjectId(any(), any(Integer.class), any(Integer.class), any()))
 				.thenReturn(ResponseEntity.ok(new ApiResponse<>(null, "Project sales fetched successfully", true, Instant.now())));
 
 		mockMvc.perform(get("/sales/project/P001"))
@@ -117,7 +117,7 @@ class SalesControllerTest {
 
 	@Test
 	void deleteSale_returnsOk() throws Exception {
-		when(salesService.deleteSale("S001"))
+		when(salesService.deleteSale(any(), any()))
 				.thenReturn(ResponseEntity.ok(new ApiResponse<>(null, "Sale deleted successfully", true, Instant.now())));
 
 		mockMvc.perform(delete("/sales/S001"))

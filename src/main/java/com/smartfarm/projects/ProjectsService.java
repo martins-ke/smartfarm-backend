@@ -60,16 +60,13 @@ public class ProjectsService {
 		this.inventoryUsageRepo = inventoryUsageRepo;
 	}
 	
-	public ResponseEntity<ApiResponse<Project>> createProject(CreateProjectRequest request, String userId, String userRole){
-		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+	public ResponseEntity<ApiResponse<Project>> createProject(CreateProjectRequest request, User currentUser){
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole())) {
 			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Supervisors are not permitted to create projects.", false, Instant.now()));
 		}
 
-		if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-			User manager = userRepo.findById(userId.trim()).orElse(null);
-			if (manager == null) {
-				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Manager not found.", false, Instant.now()));
-			}
+		if ("MANAGER".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			User manager = currentUser;
 			boolean isAssigned = manager.getAssignedCategories().stream()
 					.anyMatch(c -> c.getId().equalsIgnoreCase(request.category_id()));
 			if (!isAssigned) {
@@ -107,19 +104,19 @@ public class ProjectsService {
 	}
 
 	public ResponseEntity<ApiResponse<Project>> createProject(CreateProjectRequest request) {
-		return createProject(request, null, null);
+		return createProject(request, null);
 	}
 	
-	public ResponseEntity<ApiResponse<Page<Project>>> getProjectsByCategoryId(String category_id, int page, int size, String userId, String userRole){
+	public ResponseEntity<ApiResponse<Page<Project>>> getProjectsByCategoryId(String category_id, int page, int size, User currentUser){
 		Pageable pageable = PageRequest.of(page, size, Sort.by("name").ascending());
 		
-		if ("SUPERVISOR".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
 			// Supervisor ONLY sees projects assigned to them
-			Page<Project> supProjects = projectRepo.findProjectsForSupervisor(category_id, userId.trim(), pageable);
+			Page<Project> supProjects = projectRepo.findProjectsForSupervisor(category_id, currentUser.getId(), pageable);
 			return ResponseEntity.status(200).body(new ApiResponse<>(supProjects, null, true, Instant.now()));
-		} else if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
+		} else if ("MANAGER".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
 			// Manager sees projects assigned to them or in their assigned categories
-			Page<Project> mgrProjects = projectRepo.findProjectsForManager(category_id, userId.trim(), pageable);
+			Page<Project> mgrProjects = projectRepo.findProjectsForManager(category_id, currentUser.getId(), pageable);
 			return ResponseEntity.status(200).body(new ApiResponse<>(mgrProjects, null, true, Instant.now()));
 		}
 
@@ -127,20 +124,20 @@ public class ProjectsService {
 		return ResponseEntity.status(200).body(new ApiResponse<>(projectRepo.findByCategoryId(category_id, pageable), null, true, Instant.now()));
 	}
 	
-	public ResponseEntity<ApiResponse<ProjectResponse>> getProjectById(String id, String userId, String userRole){
+	public ResponseEntity<ApiResponse<ProjectResponse>> getProjectById(String id, User currentUser){
 		Project project = projectRepo.findProjectWithRecords(id).orElseThrow(()-> new EntityNotFoundException("Project not found with id: " + id)); 
 		
 		// Guard: If supervisor, verify assigned to this project
-		if ("SUPERVISOR".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-			boolean isAssigned = project.getSupervisor() != null && userId.trim().equals(project.getSupervisor().getId());
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			boolean isAssigned = project.getSupervisor() != null && currentUser.getId().trim().equals(project.getSupervisor().getId());
 			if (!isAssigned) {
 				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to supervise this project.", false, Instant.now()));
 			}
 		}
 
 		// Guard: If manager, verify assigned to category
-		if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-			User manager = userRepo.findById(userId.trim()).orElse(null);
+		if ("MANAGER".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			User manager = currentUser;
 			if (manager != null) {
 				boolean isAssigned = manager.getAssignedCategories().stream()
 						.anyMatch(c -> c.getId().equalsIgnoreCase(project.getCategory().getId()));
@@ -150,12 +147,12 @@ public class ProjectsService {
 			}
 		}
 
-		boolean isSupervisor = "SUPERVISOR".equalsIgnoreCase(userRole);
+		boolean isSupervisor = "SUPERVISOR".equalsIgnoreCase(currentUser.getRole());
 		boolean canViewFinancials = true;
 		if (isSupervisor) {
 			canViewFinancials = false;
-		} else if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-			User manager = userRepo.findById(userId.trim()).orElse(null);
+		} else if ("MANAGER".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			User manager = currentUser;
 			if (manager != null && (manager.getPrivileges() == null || !manager.getPrivileges().contains("CAN_VIEW_FINANCIALS"))) {
 				canViewFinancials = false;
 			}
@@ -189,11 +186,11 @@ public class ProjectsService {
 		return ResponseEntity.status(200).body(new ApiResponse<>( p, null, true, Instant.now()));
 	}
 	
-	public ResponseEntity<ApiResponse<List<Project>>> getAllProjects(String userId, String userRole) {
-		if ("SUPERVISOR".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-			return ResponseEntity.ok(new ApiResponse<>(projectRepo.findBySupervisorId(userId.trim()), null, true, Instant.now()));
-		} else if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-			return ResponseEntity.ok(new ApiResponse<>(projectRepo.findProjectsListForManager(userId.trim()), null, true, Instant.now()));
+	public ResponseEntity<ApiResponse<List<Project>>> getAllProjects(User currentUser) {
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			return ResponseEntity.ok(new ApiResponse<>(projectRepo.findBySupervisorId(currentUser.getId()), null, true, Instant.now()));
+		} else if ("MANAGER".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			return ResponseEntity.ok(new ApiResponse<>(projectRepo.findProjectsListForManager(currentUser.getId()), null, true, Instant.now()));
 		}
 		return ResponseEntity.ok(new ApiResponse<>(projectRepo.findAll(), null, true, Instant.now()));
 	}
@@ -210,21 +207,21 @@ public class ProjectsService {
 		 return ResponseEntity.status(200).body(new ApiResponse<>( projectRepo.totaActiveProjects("active"), "Projects currently marked as active.", true, Instant.now()));
 	}
 	
-	public ResponseEntity<ApiResponse<ProjectsSummary>> projectsSummary(String userId, String userRole){ 
+	public ResponseEntity<ApiResponse<ProjectsSummary>> projectsSummary(User currentUser){ 
 		Long allCount;
 		Long activeCount;
 		BigDecimal totalBudget;
 
-		if ("SUPERVISOR".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-			allCount = projectRepo.countBySupervisorId(userId.trim());
-			activeCount = projectRepo.countActiveBySupervisorId(userId.trim(), "active");
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			allCount = projectRepo.countBySupervisorId(currentUser.getId());
+			activeCount = projectRepo.countActiveBySupervisorId(currentUser.getId(), "active");
 			totalBudget = BigDecimal.ZERO; // Financial Shield for Supervisor
-		} else if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-			allCount = projectRepo.countForManager(userId.trim());
-			activeCount = projectRepo.countActiveForManager(userId.trim(), "active");
-			User manager = userRepo.findById(userId.trim()).orElse(null);
+		} else if ("MANAGER".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			allCount = projectRepo.countForManager(currentUser.getId());
+			activeCount = projectRepo.countActiveForManager(currentUser.getId(), "active");
+			User manager = currentUser;
 			if (manager != null && manager.getPrivileges() != null && manager.getPrivileges().contains("CAN_VIEW_FINANCIALS")) {
-				totalBudget = projectRepo.totalBudgetForManager(userId.trim());
+				totalBudget = projectRepo.totalBudgetForManager(currentUser.getId());
 			} else {
 				totalBudget = BigDecimal.ZERO;
 			}
@@ -238,21 +235,21 @@ public class ProjectsService {
 		return ResponseEntity.status(200).body(new ApiResponse<>(summary, "Projects summary", true, Instant.now()));
 	}
 
-	public ResponseEntity<ApiResponse<Project>> updateProjectStatus(String id, UpdateStatusRequest request, String userId, String userRole) {
+	public ResponseEntity<ApiResponse<Project>> updateProjectStatus(String id, UpdateStatusRequest request, User currentUser) {
 		Project project = projectRepo.findById(id)
 				.orElseThrow(() -> new EntityNotFoundException("Project not found: " + id));
 
-		String effectiveRole = userRole != null ? userRole.trim().toUpperCase() : null;
+		String effectiveRole = currentUser.getRole() != null ? currentUser.getRole().trim().toUpperCase() : null;
 		User callingUser = null;
-		if (userId != null && !userId.trim().isEmpty()) {
-			callingUser = userRepo.findById(userId.trim()).orElse(null);
+		if (currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			callingUser = currentUser;
 			if (callingUser != null && effectiveRole == null) {
 				effectiveRole = callingUser.getRole().toUpperCase();
 			}
 		}
 
 		if ("SUPERVISOR".equalsIgnoreCase(effectiveRole)) {
-			boolean isAssigned = project.getSupervisor() != null && userId != null && userId.trim().equals(project.getSupervisor().getId());
+			boolean isAssigned = project.getSupervisor() != null && currentUser != null && currentUser.getId().trim().equals(project.getSupervisor().getId());
 			if (!isAssigned) {
 				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to supervise this project.", false, Instant.now()));
 			}
@@ -280,18 +277,18 @@ public class ProjectsService {
 	}
 
 	public ResponseEntity<ApiResponse<Project>> updateProjectStatus(String id, UpdateStatusRequest request) {
-		return updateProjectStatus(id, request, null, null);
+		return updateProjectStatus(id, request, null);
 	}
 
-	public ResponseEntity<ApiResponse<Project>> updateProject(String id, UpdateProjectRequest request, String userId, String userRole) {
+	public ResponseEntity<ApiResponse<Project>> updateProject(String id, UpdateProjectRequest request, User currentUser) {
 		Project project = projectRepo.findById(id)
 				.orElseThrow(() -> new EntityNotFoundException("Project not found: " + id));
 		HarvestInventory inventoryItem = harvestInventoryRepo.findByProjectName(project.getName()).orElse(null); 
 
-		String effectiveRole = userRole != null ? userRole.trim().toUpperCase() : null;
+		String effectiveRole = currentUser.getRole() != null ? currentUser.getRole().trim().toUpperCase() : null;
 		User callingUser = null;
-		if (userId != null && !userId.trim().isEmpty()) {
-			callingUser = userRepo.findById(userId.trim()).orElse(null);
+		if (currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			callingUser = currentUser;
 			if (callingUser != null && effectiveRole == null) {
 				effectiveRole = callingUser.getRole().toUpperCase();
 			}
@@ -347,19 +344,19 @@ public class ProjectsService {
 	}
 
 	public ResponseEntity<ApiResponse<Project>> updateProject(String id, UpdateProjectRequest request) {
-		return updateProject(id, request, null, null);
+		return updateProject(id, request, null);
 	}
 
-	public ResponseEntity<ApiResponse<Project>> assignSupervisor(String id, AssignSupervisorRequest request, String userId, String userRole) {
+	public ResponseEntity<ApiResponse<Project>> assignSupervisor(String id, AssignSupervisorRequest request, User currentUser) {
 		Project project = projectRepo.findById(id)
 				.orElseThrow(() -> new EntityNotFoundException("Project not found: " + id));
 
-		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole())) {
 			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot assign supervisors.", false, Instant.now()));
 		}
 
-		if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-			User manager = userRepo.findById(userId.trim()).orElse(null);
+		if ("MANAGER".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			User manager = currentUser;
 			if (manager != null) {
 				boolean isAssigned = manager.getAssignedCategories().stream()
 						.anyMatch(c -> c.getId().equalsIgnoreCase(project.getCategory().getId()));
@@ -382,18 +379,18 @@ public class ProjectsService {
 	}
 
 	public ResponseEntity<ApiResponse<Project>> assignSupervisor(String id, AssignSupervisorRequest request) {
-		return assignSupervisor(id, request, null, null);
+		return assignSupervisor(id, request, null);
 	}
 
 	@Transactional
-	public ResponseEntity<ApiResponse<Void>> deleteProject(String id, String userId, String userRole) {
+	public ResponseEntity<ApiResponse<Void>> deleteProject(String id, User currentUser) {
 		Project project = projectRepo.findById(id)
 				.orElseThrow(() -> new EntityNotFoundException("Project not found: " + id));
 
-		String effectiveRole = userRole != null ? userRole.trim().toUpperCase() : null;
+		String effectiveRole = currentUser.getRole() != null ? currentUser.getRole().trim().toUpperCase() : null;
 		User callingUser = null;
-		if (userId != null && !userId.trim().isEmpty()) {
-			callingUser = userRepo.findById(userId.trim()).orElse(null);
+		if (currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			callingUser = currentUser;
 			if (callingUser != null && effectiveRole == null && callingUser.getRole() != null) {
 				effectiveRole = callingUser.getRole().toUpperCase();
 			}
@@ -439,6 +436,6 @@ public class ProjectsService {
 
 	@Transactional
 	public ResponseEntity<ApiResponse<Void>> deleteProject(String id) {
-		return deleteProject(id, null, null);
+		return deleteProject(id, null);
 	}
 }

@@ -41,9 +41,9 @@ public class NotificationService {
 		this.customerRepo = customerRepo;
 	}
 
-	public ResponseEntity<ApiResponse<NotificationSummaryResponse>> getNotifications(String userId, String userRole) {
-		boolean isAdmin = "ADMIN".equalsIgnoreCase(userRole);
-		boolean isManager = "MANAGER".equalsIgnoreCase(userRole);
+	public ResponseEntity<ApiResponse<NotificationSummaryResponse>> getNotifications(User currentUser) {
+		boolean isAdmin = "ADMIN".equalsIgnoreCase(currentUser.getRole());
+		boolean isManager = "MANAGER".equalsIgnoreCase(currentUser.getRole());
 		List<NotificationResponse> list = new ArrayList<>();
 		LocalDate today = LocalDate.now();
 

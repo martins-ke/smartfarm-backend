@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 import org.springframework.http.ResponseEntity;
+import com.smartfarm.user.User;
 import org.springframework.stereotype.Service;
 
 import com.smartfarm.ApiResponse;
@@ -23,33 +24,31 @@ public class HarvestService {
 	private static final Logger log = LoggerFactory.getLogger(HarvestService.class);
 	private final HarvestRepository harvestRepo;
 	private final ProjectRepository projectRepo;
-	private final com.smartfarm.user.UserRepository userRepo;
 	private final HarvestInventoryRepository harvestInventoryRepo;
 	
 	public HarvestService(HarvestRepository harvestRepo, ProjectRepository projectRepo, com.smartfarm.user.UserRepository userRepo, HarvestInventoryRepository harvestInventoryRepo) {
 		this.harvestRepo = harvestRepo;
 		this.projectRepo = projectRepo;
-		this.userRepo = userRepo;
 		this.harvestInventoryRepo = harvestInventoryRepo;
 	}
 	
 	@Transactional
-	public ResponseEntity<ApiResponse<Harvest>> recordHarvest(CreateHarvestRequest request, String userId, String userRole){ 
+	public ResponseEntity<ApiResponse<Harvest>> recordHarvest(CreateHarvestRequest request, User currentUser){ 
 		Project project = projectRepo.findById(request.project_id()).orElseThrow(()-> new EntityNotFoundException("Project not in the system!"));
 
-		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
-			boolean isAssigned = project.getSupervisor() != null && userId != null && userId.trim().equals(project.getSupervisor().getId());
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole())) {
+			boolean isAssigned = project.getSupervisor() != null && currentUser != null && currentUser.getId().trim().equals(project.getSupervisor().getId());
 			if (!isAssigned) {
 				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to supervise this project.", false, Instant.now()));
 			}
-			if (userId != null) {
-				com.smartfarm.user.User sup = userRepo.findById(userId.trim()).orElse(null);
+			if (currentUser != null) {
+				com.smartfarm.user.User sup = currentUser;
 				if (sup == null || sup.getPrivileges() == null || !sup.getPrivileges().contains("CAN_RECORD_HARVEST")) {
 					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You do not have privilege to record harvest yields.", false, Instant.now()));
 				}
 			}
-		} else if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-			com.smartfarm.user.User manager = userRepo.findById(userId.trim()).orElse(null);
+		} else if ("MANAGER".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			com.smartfarm.user.User manager = currentUser;
 			if (manager != null) {
 				boolean isAssigned = manager.getAssignedCategories().stream()
 						.anyMatch(c -> c.getId().equalsIgnoreCase(project.getCategory().getId()));
@@ -94,11 +93,11 @@ public class HarvestService {
 	}
 
 	public ResponseEntity<ApiResponse<Harvest>> recordHarvest(CreateHarvestRequest request) {
-		return recordHarvest(request, null, null);
+		return recordHarvest(request, null);
 	}
 
 	@Transactional
-	public ResponseEntity<ApiResponse<Harvest>> updateHarvest(String id, UpdateHarvestRequest request, String userId, String userRole) {
+	public ResponseEntity<ApiResponse<Harvest>> updateHarvest(String id, UpdateHarvestRequest request, User currentUser) {
 		Harvest harvest = harvestRepo.findById(id)
 				.orElseThrow(() -> new EntityNotFoundException("Harvest not found with ID: " + id));
 
@@ -159,12 +158,12 @@ public class HarvestService {
 	}
 
 	public ResponseEntity<ApiResponse<Harvest>> updateHarvest(String id, UpdateHarvestRequest request) {
-		return updateHarvest(id, request, null, null);
+		return updateHarvest(id, request, null);
 	}
 
 	@Transactional
-	public ResponseEntity<ApiResponse<Void>> deleteHarvest(String id, String userId, String userRole) {
-		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+	public ResponseEntity<ApiResponse<Void>> deleteHarvest(String id, User currentUser) {
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole())) {
 			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot delete harvest logs.", false, Instant.now()));
 		}
 
@@ -196,7 +195,7 @@ public class HarvestService {
 	}
 
 	public ResponseEntity<ApiResponse<Void>> deleteHarvest(String id) {
-		return deleteHarvest(id, null, null);
+		return deleteHarvest(id, null);
 	}
 	
     public ResponseEntity<ApiResponse<java.util.List<HarvestInventory>>> getHarvestInventory() {

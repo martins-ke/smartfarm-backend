@@ -6,5 +6,10 @@ public record AssignLaborRequest(
 	String employeeId,
 	LocalDate assignmentDate,
 	double hoursWorked,
-	String notes
-) {}
+	String notes,
+	Double daysWorked
+) {
+	public AssignLaborRequest(String employeeId, LocalDate assignmentDate, double hoursWorked, String notes) {
+		this(employeeId, assignmentDate, hoursWorked, notes, null);
+	}
+}

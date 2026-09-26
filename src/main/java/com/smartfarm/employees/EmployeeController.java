@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.smartfarm.user.User;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.smartfarm.ApiResponse;
@@ -34,7 +36,7 @@ public class EmployeeController {
 	}
 
 	@PostMapping
-	public ResponseEntity<ApiResponse<Employee>> registerEmployee(@RequestBody EmployeeRequest request) {
+	public ResponseEntity<ApiResponse<Employee>> registerEmployee(@RequestBody EmployeeRequest request, @AuthenticationPrincipal User currentUser) {
 		return employeeService.registerEmployee(request);
 	}
 
@@ -45,7 +47,12 @@ public class EmployeeController {
 	}
 
 	@org.springframework.web.bind.annotation.PutMapping("/{id}")
-	public ResponseEntity<ApiResponse<Employee>> updateEmployee(@PathVariable String id, @RequestBody EmployeeRequest request) {
+	public ResponseEntity<ApiResponse<Employee>> updateEmployee(@PathVariable String id, @RequestBody EmployeeRequest request, @AuthenticationPrincipal User currentUser) {
 		return employeeService.updateEmployee(id, request);
+	}
+
+	@org.springframework.web.bind.annotation.DeleteMapping("/{id}")
+	public ResponseEntity<ApiResponse<Void>> deleteEmployee(@PathVariable String id, @AuthenticationPrincipal User currentUser) {
+		return employeeService.deleteEmployee(id);
 	}
 }

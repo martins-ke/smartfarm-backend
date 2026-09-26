@@ -22,4 +22,10 @@ public interface ActivityRepository extends JpaRepository<Activity, String> {
 
 	@Query("SELECT a FROM Activity a WHERE a.scheduledDate < :currentDate AND LOWER(a.status) != 'completed' AND LOWER(a.status) != 'cancelled'")
 	List<Activity> findOverdueTasks(@Param("currentDate") LocalDate currentDate);
+
+	@Query("SELECT a FROM Activity a WHERE LOWER(a.status) IN ('in_progress', 'scheduled') ORDER BY CASE WHEN LOWER(a.status) = 'in_progress' THEN 0 ELSE 1 END, a.scheduledDate ASC")
+	List<Activity> findOperationalActivities(org.springframework.data.domain.Pageable pageable);
+
+	@Query("SELECT a FROM Activity a WHERE a.project.id IN :projectIds AND LOWER(a.status) IN ('in_progress', 'scheduled') ORDER BY CASE WHEN LOWER(a.status) = 'in_progress' THEN 0 ELSE 1 END, a.scheduledDate ASC")
+	List<Activity> findOperationalActivitiesByProjectIds(@Param("projectIds") java.util.Collection<String> projectIds, org.springframework.data.domain.Pageable pageable);
 }

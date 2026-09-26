@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import com.smartfarm.user.User;
 import org.springframework.stereotype.Service;
 
 import com.smartfarm.ApiResponse;
@@ -19,12 +20,12 @@ public class CategoryService {
 		this.userRepo = userRepo;
 	}
 
-	public ResponseEntity<ApiResponse<Category>> createCategory(CategoryRequest request, String userId, String userRole){ 
-		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+	public ResponseEntity<ApiResponse<Category>> createCategory(CategoryRequest request, User currentUser){ 
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole())) {
 			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Supervisors are not permitted to create categories.", false, Instant.now()));
 		}
-		if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-			com.smartfarm.user.User manager = userRepo.findById(userId.trim()).orElse(null);
+		if ("MANAGER".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			com.smartfarm.user.User manager = currentUser;
 			if (manager == null || manager.getPrivileges() == null || !manager.getPrivileges().contains("CAN_CREATE_CATEGORIES")) {
 				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You do not have privilege to create categories.", false, Instant.now()));
 			}
@@ -41,8 +42,8 @@ public class CategoryService {
 		Category saved = categoryRepo.save(c);
 
 		// If manager created it, automatically assign it to their assignedCategories
-		if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-			com.smartfarm.user.User manager = userRepo.findById(userId.trim()).orElse(null);
+		if ("MANAGER".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			com.smartfarm.user.User manager = currentUser;
 			if (manager != null) {
 				manager.getAssignedCategories().add(saved);
 				userRepo.save(manager);
@@ -53,30 +54,27 @@ public class CategoryService {
 	} 
 
 	public ResponseEntity<ApiResponse<Category>> createCategory(CategoryRequest request) {
-		return createCategory(request, null, null);
+		return createCategory(request, null);
 	} 
 	
-	public ResponseEntity<ApiResponse<List<Category>>> getAllCategories(String userId, String userRole) { 
-		if ("SUPERVISOR".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-			List<Category> supCats = categoryRepo.findCategoriesForSupervisor(userId.trim());
+	public ResponseEntity<ApiResponse<List<Category>>> getAllCategories(User currentUser) { 
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			List<Category> supCats = categoryRepo.findCategoriesForSupervisor(currentUser.getId());
 			return ResponseEntity.status(200).body(new ApiResponse<>(supCats, null, true, Instant.now()));
-		} else if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-			List<Category> managerCats = categoryRepo.findCategoriesForManager(userId.trim());
+		} else if ("MANAGER".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			List<Category> managerCats = categoryRepo.findCategoriesForManager(currentUser.getId());
 			return ResponseEntity.status(200).body(new ApiResponse<>(managerCats, null, true, Instant.now()));
 		}
 		return ResponseEntity.status(200).body(new ApiResponse<>(categoryRepo.findAll(), null, true, Instant.now())); 
 	}
 
-	public ResponseEntity<ApiResponse<Category>> updateCategory(String id, CategoryRequest request, String userId, String userRole) {
-		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+	public ResponseEntity<ApiResponse<Category>> updateCategory(String id, CategoryRequest request, User currentUser) {
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole())) {
 			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot edit categories.", false, Instant.now()));
 		}
 
-		if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-			com.smartfarm.user.User manager = userRepo.findById(userId.trim()).orElse(null);
-			if (manager == null) {
-				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Manager not found.", false, Instant.now()));
-			}
+		if ("MANAGER".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			com.smartfarm.user.User manager = currentUser;
 			boolean isAssigned = manager.getAssignedCategories().stream()
 					.anyMatch(c -> c.getId().equalsIgnoreCase(id));
 			if (!isAssigned) {
@@ -107,14 +105,14 @@ public class CategoryService {
 	}
 
 	public ResponseEntity<ApiResponse<Category>> updateCategory(String id, CategoryRequest request) {
-		return updateCategory(id, request, null, null);
+		return updateCategory(id, request, null);
 	}
 
-	public ResponseEntity<ApiResponse<Void>> deleteCategory(String id, String userId, String userRole) {
+	public ResponseEntity<ApiResponse<Void>> deleteCategory(String id, User currentUser) {
 		
-		if (!"ADMIN".equalsIgnoreCase(userRole)) {
-			if (userId != null && !userId.trim().isEmpty()) {
-				com.smartfarm.user.User caller = userRepo.findById(userId.trim()).orElse(null);
+		if (!"ADMIN".equalsIgnoreCase(currentUser.getRole())) {
+			if (currentUser != null && !currentUser.getId().trim().isEmpty()) {
+				com.smartfarm.user.User caller = currentUser;
 				if (caller == null || !"ADMIN".equalsIgnoreCase(caller.getRole())) {
 					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Only Administrators can delete categories.", false, Instant.now()));
 				}
@@ -129,6 +127,6 @@ public class CategoryService {
 	}
 
 	public ResponseEntity<ApiResponse<Void>> deleteCategory(String id) {
-		return deleteCategory(id, null, null);
+		return deleteCategory(id, null);
 	}
 }

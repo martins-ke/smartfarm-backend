@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.smartfarm.user.User;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.smartfarm.ApiResponse;
@@ -25,54 +27,54 @@ public class SupplierController {
 	}
 
 	@GetMapping
-	public ResponseEntity<ApiResponse<List<Supplier>>> getAllSuppliers() {
+	public ResponseEntity<ApiResponse<List<Supplier>>> getAllSuppliers(@AuthenticationPrincipal User currentUser) {
 		return supplierService.getAllSuppliers();
 	}
 
 	@GetMapping("/{id}")
-	public ResponseEntity<ApiResponse<Supplier>> getSupplierById(@PathVariable String id) {
+	public ResponseEntity<ApiResponse<Supplier>> getSupplierById(@PathVariable String id, @AuthenticationPrincipal User currentUser) {
 		return supplierService.getSupplierById(id); 
 	}
 
 	@PostMapping
-	public ResponseEntity<ApiResponse<?>> createSupplier(@Valid @RequestBody CreateSupplierRequest request) {
+	public ResponseEntity<ApiResponse<?>> createSupplier(@Valid @RequestBody CreateSupplierRequest request, @AuthenticationPrincipal User currentUser) {
 		return supplierService.createSupplier(request);
 	}
 
 	@GetMapping("/purchases")
-	public ResponseEntity<ApiResponse<List<SupplierPurchase>>> getAllPurchases() {
+	public ResponseEntity<ApiResponse<List<SupplierPurchase>>> getAllPurchases(@AuthenticationPrincipal User currentUser) {
 		return supplierService.getAllPurchases();
 	}
 
 	@GetMapping("/{id}/purchases")
-	public ResponseEntity<ApiResponse<List<SupplierPurchase>>> getSupplierPurchases(@PathVariable String id) {
+	public ResponseEntity<ApiResponse<List<SupplierPurchase>>> getSupplierPurchases(@PathVariable String id, @AuthenticationPrincipal User currentUser) {
 		return supplierService.getSupplierPurchases(id);
 	}
 
 	@GetMapping("/purchases/{purchaseId}/payments")
-	public ResponseEntity<ApiResponse<List<SupplierPayment>>> getPurchasePaymentsDirect(@PathVariable String purchaseId) {
+	public ResponseEntity<ApiResponse<List<SupplierPayment>>> getPurchasePaymentsDirect(@PathVariable String purchaseId, @AuthenticationPrincipal User currentUser) {
 		return supplierService.getPurchasePayments(purchaseId);
 	}
 
 	@GetMapping("/{id}/purchases/{purchaseId}/payments")
-	public ResponseEntity<ApiResponse<List<SupplierPayment>>> getPurchasePayments(@PathVariable String id, @PathVariable String purchaseId) {
+	public ResponseEntity<ApiResponse<List<SupplierPayment>>> getPurchasePayments(@PathVariable String id, @PathVariable String purchaseId, @AuthenticationPrincipal User currentUser) {
 		return supplierService.getPurchasePayments(purchaseId);
 	}
 
 	@GetMapping("/{id}/payments")
-	public ResponseEntity<ApiResponse<List<SupplierPayment>>> getSupplierPayments(@PathVariable String id) {
+	public ResponseEntity<ApiResponse<List<SupplierPayment>>> getSupplierPayments(@PathVariable String id, @AuthenticationPrincipal User currentUser) {
 		return supplierService.getSupplierPayments(id);
 	}
 
 	@PostMapping("/purchases")
 	public ResponseEntity<ApiResponse<?>> recordPurchase(
 			@Valid @RequestBody SupplierPurchaseRequest request,
-			@org.springframework.web.bind.annotation.RequestHeader(value = "X-User-Id", required = false) String callerUserId) {
-		return supplierService.recordPurchase(request, callerUserId);
+			@AuthenticationPrincipal User currentUser) {
+		return supplierService.recordPurchase(request, currentUser);
 	}
 
 	@PostMapping("/{id}/payments")
-	public ResponseEntity<ApiResponse<?>> recordPayment(@PathVariable String id, @Valid @RequestBody SupplierPaymentRequest request) {
+	public ResponseEntity<ApiResponse<?>> recordPayment(@PathVariable String id, @Valid @RequestBody SupplierPaymentRequest request, @AuthenticationPrincipal User currentUser) {
 		return supplierService.recordPayment(id, request);
 	}
 }

@@ -23,6 +23,7 @@ import com.smartfarm.auth.EmailService;
 import java.util.UUID;
 import java.time.temporal.ChronoUnit;
 
+import com.smartfarm.security.JwtService;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,17 +39,19 @@ public class UserService {
 	private final PasswordEncoder passwordEncoder;
 	private final PasswordResetTokenRepository tokenRepo;
 	private final EmailService emailService;
+	private final JwtService jwtService;
 
 	private static final long MAX_MANAGERS = 2; 
 	private static final long MAX_SUPERVISORS = 10;
 
-	public UserService(UserRepository userRepo, CategoryRepository categoryRepo, ProjectRepository projectRepo, PasswordEncoder passwordEncoder, PasswordResetTokenRepository tokenRepo, EmailService emailService) {
+	public UserService(UserRepository userRepo, CategoryRepository categoryRepo, ProjectRepository projectRepo, PasswordEncoder passwordEncoder, PasswordResetTokenRepository tokenRepo, EmailService emailService, JwtService jwtService) {
 		this.userRepo = userRepo;
 		this.categoryRepo = categoryRepo;
 		this.projectRepo = projectRepo;
 		this.passwordEncoder = passwordEncoder;
 		this.tokenRepo = tokenRepo;
 		this.emailService = emailService;
+		this.jwtService = jwtService;
 	} 
 
 	public ResponseEntity<ApiResponse<BootstrapStatusResponse>> checkBootstrap() {
@@ -183,7 +186,8 @@ public class UserService {
 			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Account deactivated. Please contact your farm Administrator.", false, Instant.now()));
 		}
 
-		return ResponseEntity.status(200).body(new ApiResponse<>(user, "Login successful", true, Instant.now()));
+		String token = jwtService.generateToken(user);
+		return ResponseEntity.status(200).body(new ApiResponse<>(new LoginResponse(user, token), "Login successful", true, Instant.now()));
 	}
 
 	public ResponseEntity<ApiResponse<?>> forgotPassword(ForgotPasswordRequest request) {
@@ -247,14 +251,9 @@ public class UserService {
 	}
 
 	@Transactional
-	public ResponseEntity<ApiResponse<User>> adminResetPassword(String userId, AdminResetPasswordRequest request, String callerUserId, String callerUserRole) {
-		if (!"ADMIN".equalsIgnoreCase(callerUserRole)) {
-			if (callerUserId != null && !callerUserId.trim().isEmpty()) {
-				User caller = userRepo.findById(callerUserId.trim()).orElse(null);
-				if (caller == null || !"ADMIN".equalsIgnoreCase(caller.getRole())) {
+	public ResponseEntity<ApiResponse<User>> adminResetPassword(String userId, AdminResetPasswordRequest request, User currentUser) {
+		if (!"ADMIN".equalsIgnoreCase(currentUser.getRole())) {
 					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Only Administrators can reset passwords for other accounts.", false, Instant.now()));
-				}
-			}
 		}
 
 		User user = userRepo.findById(userId)
@@ -264,11 +263,6 @@ public class UserService {
 		userRepo.save(user);
 
 		return ResponseEntity.ok(new ApiResponse<>(user, "Password has been successfully updated by Admin.", true, Instant.now()));
-	}
-
-	@Transactional
-	public ResponseEntity<ApiResponse<User>> adminResetPassword(String userId, AdminResetPasswordRequest request) {
-		return adminResetPassword(userId, request, null, null);
 	}
 
 	public ResponseEntity<ApiResponse<List<User>>> getAllUsers(String role, String createdById) {
@@ -298,30 +292,23 @@ public class UserService {
 	}
 
 	@Transactional
-	public ResponseEntity<ApiResponse<User>> createStaff(CreateStaffRequest request, String callerUserId, String callerUserRole) {
+	public ResponseEntity<ApiResponse<User>> createStaff(CreateStaffRequest request, User currentUser) {
 		String username = request.username().trim();
 		String password = request.password().trim();
 		String role = request.role().trim().toUpperCase();
 
-		String effectiveCallerRole = callerUserRole;
-		User caller = null;
-		if (callerUserId != null && !callerUserId.trim().isEmpty()) {
-			caller = userRepo.findById(callerUserId.trim()).orElse(null);
-			if (caller != null && effectiveCallerRole == null) {
-				effectiveCallerRole = caller.getRole();
-			}
-		}
 
-		if ("SUPERVISOR".equalsIgnoreCase(effectiveCallerRole)) {
+
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole())) {
 			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot create or provision staff accounts.", false, Instant.now()));
 		}
 
-		if ("MANAGER".equalsIgnoreCase(effectiveCallerRole)) {
+		if ("MANAGER".equalsIgnoreCase(currentUser.getRole())) {
 			if ("MANAGER".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role)) {
 				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Only Administrators can create Manager accounts.", false, Instant.now()));
 			}
 			if ("SUPERVISOR".equalsIgnoreCase(role)) {
-				if (caller != null && (caller.getPrivileges() == null || !caller.getPrivileges().contains("CAN_CREATE_SUPERVISORS"))) {
+				if (currentUser != null && (currentUser.getPrivileges() == null || !currentUser.getPrivileges().contains("CAN_CREATE_SUPERVISORS"))) {
 					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You do not have privilege to create and provision supervisors.", false, Instant.now()));
 				}
 			}
@@ -358,20 +345,16 @@ public class UserService {
 		}
 
 		String hashedPassword = passwordEncoder.encode(password);
-		String creatorId = request.createdById() != null ? request.createdById() : (caller != null ? caller.getId() : null);
+		String creatorId = request.createdById() != null ? request.createdById() : (currentUser != null ? currentUser.getId() : null);
 		User user = new User(id, username, email, hashedPassword, role, "ACTIVE", creatorId);
 		User saved = userRepo.save(user);
 
 		return ResponseEntity.status(201).body(new ApiResponse<>(saved, role + " created and activated successfully.", true, Instant.now()));
 	}
 
-	public ResponseEntity<ApiResponse<User>> createStaff(CreateStaffRequest request) {
-		return createStaff(request, null, null);
-	}
-
 	@Transactional
-	public ResponseEntity<ApiResponse<User>> updateUserStatus(String id, UpdateUserStatusRequest request, String callerUserId, String callerUserRole) {
-		if ("SUPERVISOR".equalsIgnoreCase(callerUserRole)) {
+	public ResponseEntity<ApiResponse<User>> updateUserStatus(String id, UpdateUserStatusRequest request, User currentUser) {
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole())) {
 			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot modify account status.", false, Instant.now()));
 		}
 
@@ -385,19 +368,10 @@ public class UserService {
 		return ResponseEntity.ok(new ApiResponse<>(saved, "User status updated to " + newStatus, true, Instant.now()));
 	}
 
-	public ResponseEntity<ApiResponse<User>> updateUserStatus(String id, UpdateUserStatusRequest request) {
-		return updateUserStatus(id, request, null, null);
-	}
-
 	@Transactional
-	public ResponseEntity<ApiResponse<User>> assignCategories(String id, AssignCategoriesRequest request, String callerUserId, String callerUserRole) {
-		if (!"ADMIN".equalsIgnoreCase(callerUserRole)) {
-			if (callerUserId != null && !callerUserId.trim().isEmpty()) {
-				User caller = userRepo.findById(callerUserId.trim()).orElse(null);
-				if (caller == null || !"ADMIN".equalsIgnoreCase(caller.getRole())) {
+	public ResponseEntity<ApiResponse<User>> assignCategories(String id, AssignCategoriesRequest request, User currentUser) {
+		if (!"ADMIN".equalsIgnoreCase(currentUser.getRole())) {
 					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Only Administrators can assign categories to managers.", false, Instant.now()));
-				}
-			}
 		}
 
 		User user = userRepo.findById(id)
@@ -421,13 +395,9 @@ public class UserService {
 		return ResponseEntity.ok(new ApiResponse<>(saved, msg, true, Instant.now()));
 	}
 
-	public ResponseEntity<ApiResponse<User>> assignCategories(String id, AssignCategoriesRequest request) {
-		return assignCategories(id, request, null, null);
-	}
-
 	@Transactional
-	public ResponseEntity<ApiResponse<Void>> assignProjectsToSupervisor(String supervisorId, AssignProjectsRequest request, String callerUserId, String callerUserRole) {
-		if ("SUPERVISOR".equalsIgnoreCase(callerUserRole)) {
+	public ResponseEntity<ApiResponse<Void>> assignProjectsToSupervisor(String supervisorId, AssignProjectsRequest request, User currentUser) {
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole())) {
 			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot assign projects.", false, Instant.now()));
 		}
 
@@ -465,20 +435,16 @@ public class UserService {
 		return ResponseEntity.ok(new ApiResponse<>(null, "Projects assigned to " + supervisor.getUsername() + " successfully.", true, Instant.now()));
 	}
 
-	public ResponseEntity<ApiResponse<Void>> assignProjectsToSupervisor(String supervisorId, AssignProjectsRequest request) {
-		return assignProjectsToSupervisor(supervisorId, request, null, null);
-	}
-
 	@Transactional
-	public ResponseEntity<ApiResponse<User>> updatePrivileges(String id, UpdatePrivilegesRequest request, String callerUserId, String callerUserRole) {
+	public ResponseEntity<ApiResponse<User>> updatePrivileges(String id, UpdatePrivilegesRequest request, User currentUser) {
 		User targetUser = userRepo.findById(id)
 			.orElseThrow(() -> new EntityNotFoundException("User not found: " + id));
 
-		boolean isAdmin = "ADMIN".equalsIgnoreCase(callerUserRole);
-		boolean isManager = "MANAGER".equalsIgnoreCase(callerUserRole);
+		boolean isAdmin = "ADMIN".equalsIgnoreCase(currentUser.getRole());
+		boolean isManager = "MANAGER".equalsIgnoreCase(currentUser.getRole());
 
-		if (callerUserId != null && !callerUserId.trim().isEmpty()) {
-			User caller = userRepo.findById(callerUserId.trim()).orElse(null);
+		if (currentUser.getId() != null && !currentUser.getId().isEmpty()) {
+			User caller = userRepo.findById(currentUser.getId()).orElse(null);
 			if (caller != null) {
 				if ("ADMIN".equalsIgnoreCase(caller.getRole())) isAdmin = true;
 				if ("MANAGER".equalsIgnoreCase(caller.getRole())) isManager = true;
@@ -490,12 +456,12 @@ public class UserService {
 				if (!"SUPERVISOR".equalsIgnoreCase(targetUser.getRole())) {
 					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Managers can only assign privileges to Supervisors.", false, Instant.now()));
 				}
-				if (callerUserId != null && targetUser.getCreatedById() != null 
-						&& !callerUserId.trim().equalsIgnoreCase(targetUser.getCreatedById().trim())) {
+				if (currentUser.getId() != null && targetUser.getCreatedById() != null 
+						&& !currentUser.getId().equalsIgnoreCase(targetUser.getCreatedById().trim())) {
 					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You can only manage privileges for your assigned Supervisors.", false, Instant.now()));
 				}
 				
-				User caller = userRepo.findById(callerUserId).orElse(null);
+				User caller = userRepo.findById(currentUser.getId()).orElse(null);
 				if (caller != null && (caller.getPrivileges() == null || !caller.getPrivileges().contains("CAN_ASSIGN_PRIVILEGES"))) {
 					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You do not have the privilege to assign or toggle supervisor privileges.", false, Instant.now()));
 				}
@@ -525,10 +491,6 @@ public class UserService {
 
 		User saved = userRepo.save(targetUser);
 		return ResponseEntity.ok(new ApiResponse<>(saved, "Privileges updated successfully for " + targetUser.getUsername(), true, Instant.now()));
-	}
-
-	public ResponseEntity<ApiResponse<User>> updatePrivileges(String id, UpdatePrivilegesRequest request) {
-		return updatePrivileges(id, request, null, null);
 	}
 
 	public ResponseEntity<ApiResponse<List<Project>>> getSupervisorProjects(String supervisorId) {
@@ -563,14 +525,9 @@ public class UserService {
 	}
 
 	@Transactional
-	public ResponseEntity<ApiResponse<Void>> deleteUser(String id, String callerUserId, String callerUserRole) {
-		if (!"ADMIN".equalsIgnoreCase(callerUserRole)) {
-			if (callerUserId != null && !callerUserId.trim().isEmpty()) {
-				User caller = userRepo.findById(callerUserId.trim()).orElse(null);
-				if (caller == null || !"ADMIN".equalsIgnoreCase(caller.getRole())) {
+	public ResponseEntity<ApiResponse<Void>> deleteUser(String id, User currentUser) {
+		if (!"ADMIN".equalsIgnoreCase(currentUser.getRole())) {
 					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Only Administrators can delete accounts.", false, Instant.now()));
-				}
-			}
 		}
 
 		User user = userRepo.findById(id)
@@ -609,13 +566,13 @@ public class UserService {
 	}
 
 	@Transactional
-	public ResponseEntity<ApiResponse<User>> updateStaffDetails(String id, UpdateStaffRequest request, String callerUserId, String callerUserRole) {
-		boolean isAdmin = "ADMIN".equalsIgnoreCase(callerUserRole);
-		boolean isManager = "MANAGER".equalsIgnoreCase(callerUserRole);
+	public ResponseEntity<ApiResponse<User>> updateStaffDetails(String id, UpdateStaffRequest request, User currentUser) {
+		boolean isAdmin = "ADMIN".equalsIgnoreCase(currentUser.getRole());
+		boolean isManager = "MANAGER".equalsIgnoreCase(currentUser.getRole());
 
 		if (!isAdmin && !isManager) {
-			if (callerUserId != null && !callerUserId.trim().isEmpty()) {
-				User caller = userRepo.findById(callerUserId.trim()).orElse(null);
+			if (currentUser.getId() != null && !currentUser.getId().isEmpty()) {
+				User caller = userRepo.findById(currentUser.getId()).orElse(null);
 				if (caller != null) {
 					isAdmin = "ADMIN".equalsIgnoreCase(caller.getRole());
 					isManager = "MANAGER".equalsIgnoreCase(caller.getRole());
@@ -689,10 +646,5 @@ public class UserService {
 
 		User saved = userRepo.save(user);
 		return ResponseEntity.ok(new ApiResponse<>(saved, "Staff details updated successfully ✅", true, Instant.now()));
-	}
-
-	@Transactional
-	public ResponseEntity<ApiResponse<Void>> deleteUser(String id) {
-		return deleteUser(id, null, null);
 	}
 }

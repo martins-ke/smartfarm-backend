@@ -32,7 +32,10 @@ public class Employee {
 	private BigDecimal dailyRate; // Base daily wage
 
 	@Column(nullable = false)
-	private String status; // "ACTIVE", "INACTIVE"
+	private String status; // "ACTIVE", "INACTIVE", "DELETED"
+
+	@Column(name = "is_deleted", nullable = false)
+	private boolean isDeleted = false;
 
 	private String registeredById; // User ID of admin/manager who registered them
 
@@ -50,6 +53,7 @@ public class Employee {
 		this.employmentType = employmentType != null ? employmentType.toUpperCase() : "CASUAL";
 		this.dailyRate = dailyRate != null ? dailyRate : BigDecimal.ZERO;
 		this.status = status != null ? status.toUpperCase() : "ACTIVE";
+		this.isDeleted = false;
 		this.registeredById = registeredById;
 	}
 
@@ -123,5 +127,13 @@ public class Employee {
 
 	public void setCreatedAt(LocalDateTime createdAt) {
 		this.createdAt = createdAt;
+	}
+
+	public boolean isDeleted() {
+		return isDeleted;
+	}
+
+	public void setDeleted(boolean isDeleted) {
+		this.isDeleted = isDeleted;
 	}
 }

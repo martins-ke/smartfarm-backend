@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 import org.springframework.http.ResponseEntity;
+import com.smartfarm.user.User;
 import org.springframework.stereotype.Service;
 
 import com.smartfarm.ApiResponse;
@@ -18,17 +19,18 @@ public class ActivityService {
 
 	private final ActivityRepository activityRepo;
 	private final ProjectRepository projectRepo;
-	private final com.smartfarm.user.UserRepository userRepo;
 	private final com.smartfarm.employees.EmployeeRepository employeeRepo;
 	private final ActivityLaborAssignmentRepository laborRepo;
+	private final com.smartfarm.expenses.ExpenseRepository expenseRepo;
 	
 	public ActivityService(ActivityRepository activityRepo, ProjectRepository projectRepo, com.smartfarm.user.UserRepository userRepo,
-			com.smartfarm.employees.EmployeeRepository employeeRepo, ActivityLaborAssignmentRepository laborRepo) {
+			com.smartfarm.employees.EmployeeRepository employeeRepo, ActivityLaborAssignmentRepository laborRepo,
+			com.smartfarm.expenses.ExpenseRepository expenseRepo) {
 		this.activityRepo = activityRepo;
 		this.projectRepo = projectRepo;
-		this.userRepo = userRepo;
 		this.employeeRepo = employeeRepo;
 		this.laborRepo = laborRepo;
+		this.expenseRepo = expenseRepo;
 	}
 
 	public ResponseEntity<ApiResponse<java.util.List<ActivityLaborAssignment>>> getLaborAssignments(String activityId) {
@@ -36,6 +38,7 @@ public class ActivityService {
 		return ResponseEntity.ok(new ApiResponse<>(list, "Labor assignments retrieved ✅", true, Instant.now()));
 	}
 
+	@org.springframework.transaction.annotation.Transactional
 	public ResponseEntity<ApiResponse<?>> assignLaborToActivity(String activityId, AssignLaborRequest req) {
 		Activity activity = activityRepo.findById(activityId)
 				.orElseThrow(() -> new EntityNotFoundException("Activity not found with ID: " + activityId));
@@ -47,40 +50,90 @@ public class ActivityService {
 			return ResponseEntity.status(400).body(new ApiResponse<>(null, "Cannot assign inactive employee to tasks!", false, Instant.now()));
 		}
 
-		double hours = req.hoursWorked() > 0 ? req.hoursWorked() : 8.0;
 		java.math.BigDecimal daily = employee.getDailyRate() != null ? employee.getDailyRate() : java.math.BigDecimal.ZERO;
-		java.math.BigDecimal hourly = daily.divide(java.math.BigDecimal.valueOf(8), 2, java.math.RoundingMode.HALF_UP);
-		java.math.BigDecimal wage = hourly.multiply(java.math.BigDecimal.valueOf(hours)).setScale(2, java.math.RoundingMode.HALF_UP);
+		double hours;
+		java.math.BigDecimal wage;
+		java.math.BigDecimal unitPrice;
+		java.math.BigDecimal qty;
+
+		if (req.daysWorked() != null && req.daysWorked() > 0) {
+			double days = req.daysWorked();
+			hours = days * 8.0;
+			unitPrice = daily;
+			qty = java.math.BigDecimal.valueOf(days);
+			wage = daily.multiply(qty).setScale(2, java.math.RoundingMode.HALF_UP);
+		} else {
+			hours = req.hoursWorked() > 0 ? req.hoursWorked() : 8.0;
+			java.math.BigDecimal hourly = daily.divide(java.math.BigDecimal.valueOf(8), 2, java.math.RoundingMode.HALF_UP);
+			unitPrice = hourly;
+			qty = java.math.BigDecimal.valueOf(hours);
+			wage = hourly.multiply(qty).setScale(2, java.math.RoundingMode.HALF_UP);
+		}
+
+		LocalDate allocDate = req.assignmentDate() != null ? req.assignmentDate() : LocalDate.now();
 
 		ActivityLaborAssignment assignment = new ActivityLaborAssignment(
 			activity,
 			employee,
-			req.assignmentDate() != null ? req.assignmentDate() : LocalDate.now(),
+			allocDate,
 			hours,
 			wage,
 			req.notes()
 		);
 
 		ActivityLaborAssignment saved = laborRepo.save(assignment);
-		return ResponseEntity.status(201).body(new ApiResponse<>(saved, "Labor assigned & wage computed successfully ✅", true, Instant.now()));
+
+		// Record directly as Project Expense without creating any additional relational entity
+		Project project = activity.getProject();
+		if (project != null) {
+			long count = expenseRepo.count();
+			String expBase = "Labor: " + employee.getFullName();
+			String expenseId = IdGenarator.generateId(expBase, count);
+			while (expenseRepo.existsById(expenseId)) {
+				count++;
+				expenseId = IdGenarator.generateId(expBase, count);
+			}
+
+			String fullTitle = "Labor: " + employee.getFullName() + (activity.getTitle() != null && !activity.getTitle().isBlank() ? " (" + activity.getTitle() + ")" : "");
+			String rateDesc = (req.daysWorked() != null && req.daysWorked() > 0)
+					? (req.daysWorked() + " day(s) @ Ksh " + daily + "/day")
+					: (hours + " hr(s) @ Ksh " + unitPrice + "/hr (Daily: Ksh " + daily + ")");
+			String expNotes = "Worker: " + employee.getFullName() + " [" + employee.getEmploymentType() + "]. "
+					+ rateDesc + ". "
+					+ (req.notes() != null && !req.notes().isBlank() ? req.notes() : "");
+
+			com.smartfarm.expenses.Expense expense = new com.smartfarm.expenses.Expense(
+				expenseId,
+				fullTitle,
+				wage,
+				unitPrice,
+				qty,
+				allocDate,
+				expNotes,
+				project
+			);
+			expenseRepo.save(expense);
+		}
+
+		return ResponseEntity.status(201).body(new ApiResponse<>(saved, "Labor assigned & wage (Ksh " + wage + ") added to project expenses ✅", true, Instant.now()));
 	}
 	
-	public ResponseEntity<ApiResponse<Activity>> recordActivity(CreateActivityRequest request, String userId, String userRole){
+	public ResponseEntity<ApiResponse<Activity>> recordActivity(CreateActivityRequest request, User currentUser){
 		Project project = projectRepo.findById(request.project_id()).orElseThrow(()-> new EntityNotFoundException("Project not in the system!"));
 
-		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
-			boolean isAssigned = project.getSupervisor() != null && userId != null && userId.trim().equals(project.getSupervisor().getId());
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole())) {
+			boolean isAssigned = project.getSupervisor() != null && currentUser != null && currentUser.getId().trim().equals(project.getSupervisor().getId());
 			if (!isAssigned) {
 				return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You are not assigned to supervise this project.", false, Instant.now()));
 			}
-			if (userId != null) {
-				com.smartfarm.user.User sup = userRepo.findById(userId.trim()).orElse(null);
+			if (currentUser != null) {
+				com.smartfarm.user.User sup = currentUser;
 				if (sup == null || sup.getPrivileges() == null || !sup.getPrivileges().contains("CAN_LOG_ACTIVITIES")) {
 					return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: You do not have privilege to log daily field activities.", false, Instant.now()));
 				}
 			}
-		} else if ("MANAGER".equalsIgnoreCase(userRole) && userId != null && !userId.trim().isEmpty()) {
-			com.smartfarm.user.User manager = userRepo.findById(userId.trim()).orElse(null);
+		} else if ("MANAGER".equalsIgnoreCase(currentUser.getRole()) && currentUser != null && !currentUser.getId().trim().isEmpty()) {
+			com.smartfarm.user.User manager = currentUser;
 			if (manager != null) {
 				boolean isAssigned = manager.getAssignedCategories().stream()
 						.anyMatch(c -> c.getId().equalsIgnoreCase(project.getCategory().getId()));
@@ -108,10 +161,10 @@ public class ActivityService {
 	} 
 
 	public ResponseEntity<ApiResponse<Activity>> recordActivity(CreateActivityRequest request) {
-		return recordActivity(request, null, null);
+		return recordActivity(request, null);
 	}
 
-	public ResponseEntity<ApiResponse<Activity>> updateActivity(String id, UpdateActivityRequest request, String userId, String userRole) {
+	public ResponseEntity<ApiResponse<Activity>> updateActivity(String id, UpdateActivityRequest request, User currentUser) {
 		Activity activity = activityRepo.findById(id)
 				.orElseThrow(() -> new EntityNotFoundException("Activity not found with ID: " + id));
 
@@ -145,7 +198,7 @@ public class ActivityService {
 	}
 
 	public ResponseEntity<ApiResponse<Activity>> updateActivity(String id, UpdateActivityRequest request) {
-		return updateActivity(id, request, null, null);
+		return updateActivity(id, request, null);
 	}
 
 	public ResponseEntity<ApiResponse<Activity>> updateActivityStatus(String id, String status) {
@@ -162,8 +215,8 @@ public class ActivityService {
 		return ResponseEntity.ok(new ApiResponse<>(saved, "Activity status updated to " + newStatus + " ✅", true, Instant.now()));
 	}
 
-	public ResponseEntity<ApiResponse<Void>> deleteActivity(String id, String userId, String userRole) {
-		if ("SUPERVISOR".equalsIgnoreCase(userRole)) {
+	public ResponseEntity<ApiResponse<Void>> deleteActivity(String id, User currentUser) {
+		if ("SUPERVISOR".equalsIgnoreCase(currentUser.getRole())) {
 			return ResponseEntity.status(403).body(new ApiResponse<>(null, "Access Denied: Supervisors cannot delete activity logs.", false, Instant.now()));
 		}
 
@@ -175,6 +228,6 @@ public class ActivityService {
 	}
 
 	public ResponseEntity<ApiResponse<Void>> deleteActivity(String id) {
-		return deleteActivity(id, null, null);
+		return deleteActivity(id, null);
 	}
 }

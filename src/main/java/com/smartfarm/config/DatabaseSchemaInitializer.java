@@ -99,6 +99,9 @@ public class DatabaseSchemaInitializer implements ApplicationRunner {
                 + "assignment_date DATE, "
                 + "status VARCHAR(255) DEFAULT 'ASSIGNED')");
 
+        // Ensure employees soft delete column exists
+        addColumnSafely("employees", "is_deleted", "BOOLEAN DEFAULT FALSE");
+
         // Ensure join/helper tables exist
         executeSafely("CREATE TABLE IF NOT EXISTS user_assigned_categories ("
                 + "user_id VARCHAR(255) NOT NULL, "

@@ -10,5 +10,7 @@ public interface ActivityLaborAssignmentRepository extends JpaRepository<Activit
 
 	List<ActivityLaborAssignment> findByActivityId(String activityId);
 
+	long countByActivityId(String activityId);
+
 	List<ActivityLaborAssignment> findByEmployeeId(String employeeId);
 }

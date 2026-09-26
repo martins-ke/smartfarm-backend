@@ -69,4 +69,16 @@ public interface ProjectRepository extends JpaRepository<Project, String> {
 
 	@Query("SELECT COALESCE(SUM(p.budget), 0) FROM Project p WHERE p.manager.id = :managerId OR p.category.id IN (SELECT ac.id FROM User u JOIN u.assignedCategories ac WHERE u.id = :managerId)")
 	BigDecimal totalBudgetForManager(@Param("managerId") String managerId);
+
+	@Query("SELECT MIN(YEAR(p.startDate)) FROM Project p WHERE p.startDate IS NOT NULL")
+	Integer findEarliestProjectYear();
+
+	@Query("SELECT p FROM Project p WHERE p.startDate <= :endDate AND (p.endDate >= :startDate OR p.endDate IS NULL)")
+	List<Project> findProjectsActiveBetween(@Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate);
+
+	@Query("SELECT p FROM Project p WHERE (p.manager.id = :userId OR p.category.id IN (SELECT ac.id FROM User u JOIN u.assignedCategories ac WHERE u.id = :userId)) AND p.startDate <= :endDate AND (p.endDate >= :startDate OR p.endDate IS NULL)")
+	List<Project> findProjectsForManagerActiveBetween(@Param("userId") String userId, @Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate);
+
+	@Query("SELECT p FROM Project p WHERE p.supervisor.id = :supervisorId AND p.startDate <= :endDate AND (p.endDate >= :startDate OR p.endDate IS NULL)")
+	List<Project> findProjectsForSupervisorActiveBetween(@Param("supervisorId") String supervisorId, @Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate);
 }
