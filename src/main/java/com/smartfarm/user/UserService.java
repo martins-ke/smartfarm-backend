@@ -209,11 +209,7 @@ public class UserService {
 		);
 		tokenRepo.save(token);
 
-		// Use FRONTEND_URL environment variable if present, otherwise default to live Vercel production URL
-		String frontendUrl = System.getenv("FRONTEND_URL") != null 
-			? System.getenv("FRONTEND_URL").replaceAll("/+$", "") 
-			: "https://smartfarm-frontend-jade.vercel.app";
-		String resetLink = frontendUrl + "/reset-password?token=" + tokenString;
+		String resetLink = "https://agrosync-ke.vercel.app/reset-password?token=" + tokenString;
 		
 		try {
 			emailService.sendPasswordResetEmail(email, resetLink);
